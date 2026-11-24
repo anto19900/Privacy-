@@ -100,12 +100,22 @@ export function allowedInCluster(cluster: Cluster, p: Profile): Food[] {
   return FOODS.filter((f) => f.clusters.includes(cluster) && isAllowed(f, p)).sort((a, b) => idx(rotation, a.id) - idx(rotation, b.id));
 }
 
+const VARIETY_FACTOR = { alta: 1, media: 0.6, bassa: 0.3 } as const;
+
 function generatorPool(cluster: Cluster, p: Profile): Food[] {
-  const all = allowedInCluster(cluster, p);
-  const main = all.filter((f) => !f.fallback);
-  const want = POOL_SIZE[cluster];
+  const favs = p.favoriteFoods ?? [];
+  // i preferiti vanno in testa alla rotazione
+  const all = allowedInCluster(cluster, p).sort((a, b) => Number(favs.includes(b.id)) - Number(favs.includes(a.id)));
+  const main = all.filter((f) => !f.fallback || favs.includes(f.id));
+  const want = Math.max(1, Math.round(POOL_SIZE[cluster] * VARIETY_FACTOR[p.variety ?? 'alta']), Math.min(favs.filter((id) => all.some((f) => f.id === id)).length, POOL_SIZE[cluster]));
+  const pick0 = pickPool(all, main, want);
+  // i preferiti compaiono due volte nella rotazione → circa il doppio delle volte
+  return pick0.flatMap((f) => (favs.includes(f.id) ? [f, f] : [f]));
+}
+
+function pickPool(all: Food[], main: Food[], want: number): Food[] {
   // le varianti "di ripiego" (senza lattosio, soia, proteine in polvere) entrano solo se servono
-  const pool = [...main, ...all.filter((f) => f.fallback)].slice(0, Math.max(want, Math.min(2, all.length)));
+  const pool = [...main, ...all.filter((f) => !main.includes(f))].slice(0, Math.max(want, Math.min(2, all.length)));
   return main.length >= Math.min(want, 2) ? main.slice(0, want) : pool;
 }
 
@@ -173,7 +183,7 @@ function buildDay(p: Profile, target: MacroTarget, d: number, freeMeal: Targets[
       }
     }
     for (const slot of TEMPLATES[key]) {
-      const off = OFFSETS[key][slot.cluster]?.(d) ?? d;
+      const off = p.variety === 'bassa' && key === 'colazione' ? 0 : OFFSETS[key][slot.cluster]?.(d) ?? d;
       const food = pick(generatorPool(slot.cluster, p), off, used);
       if (!food) continue;
       if (['protein', 'snack', 'carb', 'snackCarb', 'fruit'].includes(slot.cluster)) used.push(food.id);
@@ -232,4 +242,44 @@ export function alternativesFor(day: DayPlan, mealKey: MealKey, itemIndex: numbe
 /** Indice del giorno corrente con Lunedì = 0. */
 export function todayIndex(date = new Date()): number {
   return (date.getDay() + 6) % 7;
+}
+
+/** Copia i pasti di un altro giorno (stessi alimenti) e li adatta al target di questo giorno. */
+export function copyDay(from: DayPlan, to: DayPlan, target: MacroTarget): DayPlan {
+  const meals = to.meals.map((m) => {
+    if (m.free) return m;
+    const src = from.meals.find((x) => x.key === m.key);
+    if (!src || src.free) return m;
+    return { ...m, items: src.items.map((i) => ({ ...i })) };
+  });
+  return dropEmpty(optimizeDay({ meals }, target));
+}
+
+/** Mette lo stesso pasto (stessi alimenti) in tutti i giorni della settimana. */
+export function repeatMeal(plan: WeekPlan, fromDay: number, key: MealKey, targets: Targets): WeekPlan {
+  const src = plan.days[fromDay].meals.find((m) => m.key === key);
+  if (!src || src.free) return plan;
+  const days = plan.days.map((d, i) => {
+    if (i === fromDay) return d;
+    const meals = d.meals.map((m) => (m.key === key && !m.free ? { ...m, items: src.items.map((x) => ({ ...x })) } : m));
+    return dropEmpty(optimizeDay({ meals }, targets.perDay[i]));
+  });
+  return { ...plan, days };
+}
+
+/** Sostituisce un alimento in tutta la settimana con la migliore alternativa consentita. */
+export function replaceFoodEverywhere(plan: WeekPlan, foodId: string, p: Profile, targets: Targets): WeekPlan {
+  const days = plan.days.map((d, di) => {
+    let day = d;
+    for (let guard = 0; guard < 20; guard++) {
+      const m = day.meals.find((x) => x.items.some((i) => i.foodId === foodId));
+      if (!m) break;
+      const ii = m.items.findIndex((i) => i.foodId === foodId);
+      const alt = allowedInCluster(m.items[ii].cluster, p).find((f) => f.id !== foodId);
+      if (!alt) break;
+      day = swapInDay(day, m.key, ii, alt.id, targets.perDay[di]);
+    }
+    return day;
+  });
+  return { ...plan, days };
 }

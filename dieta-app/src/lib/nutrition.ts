@@ -33,6 +33,9 @@ export const FREE_MEAL_SIZES = [
   { kcal: 1200, label: 'Abbondante', desc: '~1200 kcal' },
 ];
 
+/** +20% di carboidrati nei giorni di allenamento */
+export const TRAINING_CARB_BOOST = 0.2;
+
 export const DEFAULT_FREE_MEAL: FreeMeal = { enabled: true, day: 5, meal: 'cena', kcal: 900 };
 
 /** BMR con formula Mifflin-St Jeor. */
@@ -93,6 +96,21 @@ export function calcTargets(p: Profile): Targets {
     };
     perDay = perDay.map((_, i) => (i === fm.day ? freeDay : { ...normalDay }));
     freeMeal = { ...fm, kcal: Math.round(freeKcal / 10) * 10, capped };
+  }
+
+  // ---- Giorni di allenamento: carboidrati spostati dai giorni di riposo, media settimanale invariata ----
+  const training = (p.trainingDays ?? []).filter((d) => d >= 0 && d < 7);
+  if (training.length > 0 && training.length < 7) {
+    const isT = (i: number) => training.includes(i);
+    const base = perDay.map((d) => d.c);
+    const extra = (i: number) => Math.round(base[i] * TRAINING_CARB_BOOST);
+    const added = perDay.reduce((s, _, i) => s + (isT(i) ? extra(i) : 0), 0);
+    const restBase = perDay.reduce((s, d, i) => s + (isT(i) ? 0 : d.c), 0);
+    perDay = perDay.map((d, i) => {
+      const dc = isT(i) ? extra(i) : -Math.round((added * d.c) / Math.max(restBase, 1));
+      const c = Math.max(0, d.c + dc);
+      return { ...d, c, kcal: Math.round(d.kcal + (c - d.c) * 4) };
+    });
   }
 
   return {

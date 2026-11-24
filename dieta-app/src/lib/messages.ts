@@ -45,8 +45,8 @@ export function weekMessage(days: DayPlan[]): string {
   return out.join('\n');
 }
 
-export function shoppingMessage(groups: ShoppingGroup[], extras: { name: string; checked: boolean }[]): string {
-  const out = ['🛒 *Lista della spesa*', ''];
+export function shoppingMessage(groups: ShoppingGroup[], extras: { name: string; checked: boolean }[], title = 'Lista della spesa'): string {
+  const out = [`🛒 *${title}*`, ''];
   for (const g of groups) {
     const items = g.items.filter((i) => !i.checked);
     if (!items.length) continue;

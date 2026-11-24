@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 html, body, #root { height: 100%; }
-body { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+body { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; background-color: #f3f7f4; }
 
 @layer components {
   .card { @apply bg-white rounded-2xl shadow-sm border border-sage-100 p-4; }
@@ -19,3 +19,53 @@ body { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
 }
 
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* ---------- Tema scuro ----------
+   Le schermate usano le classi della palette chiara: in .dark le rimappiamo
+   su toni scuri (stesso accento smeraldo), così ogni componente cambia tema. */
+html.dark { color-scheme: dark; }
+html.dark body, html.dark .bg-sage-50, html.dark .bg-sage-50\/95 { background-color: #0f1512; }
+html.dark .bg-white, html.dark .bg-white\/95 { background-color: #18211c; }
+html.dark .card { background-color: #18211c; border-color: #26332b; }
+html.dark .bg-slate-50 { background-color: #1d2722; }
+html.dark .bg-slate-100 { background-color: #26332b; }
+html.dark .bg-slate-200 { background-color: #2f3d34; }
+html.dark .bg-slate-300 { background-color: #3d4c43; }
+html.dark .bg-sage-100 { background-color: #22362a; }
+html.dark .bg-emerald-50 { background-color: #133024; }
+html.dark .bg-emerald-100 { background-color: #164a33; }
+html.dark .bg-amber-50, html.dark .bg-amber-50\/60 { background-color: #33270f; }
+html.dark .bg-amber-100 { background-color: #4a3812; }
+html.dark .bg-rose-50 { background-color: #3a1820; }
+html.dark .bg-sky-50 { background-color: #12283a; }
+html.dark .bg-sky-100 { background-color: #173550; }
+
+html.dark .text-slate-900, html.dark .text-slate-800 { color: #e8efe9; }
+html.dark .text-slate-700 { color: #cfd9d2; }
+html.dark .text-slate-600 { color: #b3c1b8; }
+html.dark .text-slate-500 { color: #93a399; }
+html.dark .text-slate-400 { color: #74857a; }
+html.dark .text-slate-300 { color: #56655b; }
+html.dark .text-emerald-800, html.dark .text-emerald-700 { color: #6ee7b7; }
+html.dark .text-emerald-600 { color: #34d399; }
+html.dark .text-sage-800, html.dark .text-sage-700 { color: #b9d3c1; }
+html.dark .text-sage-600 { color: #8fb39b; }
+html.dark .text-amber-900, html.dark .text-amber-800, html.dark .text-amber-700 { color: #fcd34d; }
+html.dark .text-amber-600 { color: #fbbf24; }
+html.dark .text-rose-700, html.dark .text-rose-600 { color: #fda4af; }
+html.dark .text-sky-800, html.dark .text-sky-700 { color: #7dd3fc; }
+
+html.dark .border-slate-100, html.dark .divide-slate-100 > * + * { border-color: #26332b; }
+html.dark .border-slate-200 { border-color: #2f3d34; }
+html.dark .border-slate-300 { border-color: #3d4c43; }
+html.dark .border-sage-100 { border-color: #26332b; }
+html.dark .border-emerald-100, html.dark .border-emerald-200 { border-color: #1f5c41; }
+html.dark .border-amber-200, html.dark .border-amber-300 { border-color: #6b5214; }
+html.dark .border-rose-200, html.dark .border-rose-300 { border-color: #7a2e3b; }
+
+html.dark .input { background-color: #1d2722; border-color: #2f3d34; color: #e8efe9; }
+html.dark .btn-ghost, html.dark .chip-off { background-color: #1d2722; border-color: #2f3d34; color: #cfd9d2; }
+html.dark .btn-soft { background-color: #133024; border-color: #1f5c41; color: #6ee7b7; }
+html.dark .bg-slate-900\/40 { background-color: rgb(0 0 0 / 0.6); }
+html.dark .recharts-cartesian-grid line { stroke: #26332b; }
+html.dark .recharts-default-tooltip { background-color: #18211c !important; border-color: #2f3d34 !important; }

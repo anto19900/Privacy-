@@ -8,3 +8,8 @@ android/local.properties
 android/.idea
 android/app/src/main/assets/public
 android/capacitor-cordova-android-plugins/build
+# chiavi di firma: MAI nel repository
+android/keystore/
+android/keystore.properties
+*.jks
+*.keystore

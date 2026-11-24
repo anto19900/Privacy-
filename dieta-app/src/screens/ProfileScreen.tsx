@@ -2,13 +2,14 @@ import { Save } from 'lucide-react';
 import { useState } from 'react';
 import { MacroSummary } from '../components/MacroSummary';
 import { RemindersFields } from '../components/RemindersFields';
-import { ActivityFields, BasicFields, FreeMealFields, GoalFields, PreferenceFields, validateBasics } from '../components/ProfileFields';
+import { BackupFields } from '../components/BackupFields';
+import { ActivityFields, BasicFields, FreeMealFields, GoalFields, PlanStyleFields, PreferenceFields, validateBasics } from '../components/ProfileFields';
 import { calcTargets } from '../lib/nutrition';
 import { useStore } from '../lib/store';
 import type { Profile } from '../lib/types';
 
 export function ProfileScreen() {
-  const { profile, saveProfile, resetAll } = useStore();
+  const { profile, saveProfile, resetAll, updateProfile } = useStore();
   const [draft, setDraft] = useState<Profile | null>(profile);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   if (!draft) return null;
@@ -42,10 +43,29 @@ export function ProfileScreen() {
       <Section title="Dati personali"><BasicFields value={draft} onChange={setDraft} /></Section>
       <Section title="Attività fisica"><ActivityFields value={draft} onChange={setDraft} /></Section>
       <Section title="Obiettivo"><GoalFields value={draft} onChange={setDraft} /></Section>
+      <Section title="Varietà e allenamento"><PlanStyleFields value={draft} onChange={setDraft} /></Section>
       <Section title="Pasto libero"><FreeMealFields value={draft} onChange={setDraft} /></Section>
       <Section title="Preferenze alimentari"><PreferenceFields value={draft} onChange={setDraft} /></Section>
 
+      <Section title="Aspetto">
+        <div className="grid grid-cols-3 gap-2">
+          {([['system', '📱 Sistema'], ['light', '☀️ Chiaro'], ['dark', '🌙 Scuro']] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={(profile?.theme ?? 'system') === id ? 'chip-on' : 'chip-off'}
+              onClick={() => {
+                updateProfile({ theme: id });
+                setDraft((d) => (d ? { ...d, theme: id } : d));
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Section>
       <Section title="Promemoria (si salvano subito)"><RemindersFields /></Section>
+      <Section title="Backup ed export"><BackupFields /></Section>
 
       {msg && <p className={`rounded-xl p-3 text-sm font-medium ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-700'}`}>{msg.text}</p>}
       <button className="btn-primary w-full text-base" onClick={save}>

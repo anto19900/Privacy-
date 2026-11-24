@@ -9,7 +9,7 @@ import { dayItems, DAYS, sumMacros, todayIndex } from '../lib/plan';
 import { useStore } from '../lib/store';
 
 export function Week({ initialDay, openMamma }: { initialDay?: number; openMamma?: boolean }) {
-  const { plan, profile, targets, regenerate } = useStore();
+  const { plan, profile, targets, regenerate, copyFromPreviousDay, repeatMealAllWeek } = useStore();
   const [sel, setSel] = useState(initialDay ?? todayIndex());
   const [share, setShare] = useState<'day' | 'week' | null>(openMamma ? 'day' : null);
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -48,7 +48,10 @@ export function Week({ initialDay, openMamma }: { initialDay?: number; openMamma
               sel === i ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700'
             }`}
           >
-            <span className="text-xs font-medium opacity-80">{i === today ? 'Oggi' : ''}&nbsp;</span>
+            <span className="text-xs font-medium opacity-80">
+              {i === today ? 'Oggi' : ''}
+              {profile.trainingDays?.includes(i) ? '🏋️' : ''}&nbsp;
+            </span>
             <span className="font-bold">{name.slice(0, 3)}</span>
           </button>
         ))}
@@ -61,13 +64,22 @@ export function Week({ initialDay, openMamma }: { initialDay?: number; openMamma
         note={targets.freeMeal && targets.freeMeal.day === sel ? `Pasto libero (~${targets.freeMeal.kcal} kcal) escluso dai totali.` : undefined}
       />
 
+      <button
+        className="btn-ghost w-full text-sm"
+        onClick={() => {
+          if (confirm(`Rendere ${DAYS[sel]} uguale a ${DAYS[(sel + 6) % 7]} (stessi alimenti, grammature adattate)?`)) copyFromPreviousDay(sel);
+        }}
+      >
+        📋 Uguale a {DAYS[(sel + 6) % 7].toLowerCase()}
+      </button>
+
       <MammaButton onClick={() => setShare('day')} label={`Invia Pranzo e Cena di ${DAYS[sel]} a Mamma`} />
       <button className="btn-soft w-full" onClick={() => setShare('week')}>
         📅 Invia il riepilogo di tutta la settimana
       </button>
 
       {day.meals.map((m) => (
-        <MealCard key={`${sel}-${m.key}`} meal={m} dayIndex={sel} compact />
+        <MealCard key={`${sel}-${m.key}`} meal={m} dayIndex={sel} compact onRepeat={() => repeatMealAllWeek(sel, m.key)} />
       ))}
 
       <ShareSheet

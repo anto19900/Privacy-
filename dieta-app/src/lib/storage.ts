@@ -26,3 +26,29 @@ export function clearAll(): void {
     /* ignora */
   }
 }
+
+/** Tutti i dati dell'app (per il backup). */
+export function exportBackup(): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  try {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith(PREFIX))
+      .forEach((k) => {
+        try {
+          out[k.slice(PREFIX.length)] = JSON.parse(localStorage.getItem(k) ?? 'null');
+        } catch {
+          /* chiave corrotta: saltata */
+        }
+      });
+  } catch {
+    /* storage non disponibile */
+  }
+  return out;
+}
+
+export const BACKUP_KEYS = ['profile', 'plan', 'weights', 'shopping', 'foodLog', 'reminders', 'measurements', 'pantry'];
+
+export function importBackup(data: Record<string, unknown>): void {
+  clearAll();
+  for (const k of BACKUP_KEYS) if (k in data) save(k, data[k]);
+}

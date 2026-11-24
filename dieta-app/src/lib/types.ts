@@ -1,6 +1,7 @@
 export type Sex = 'M' | 'F';
 export type Activity = 'sedentario' | 'leggero' | 'moderato' | 'intenso';
 export type Goal = 'dimagrimento' | 'mantenimento' | 'massa';
+export type Variety = 'alta' | 'media' | 'bassa';
 export type DietType = 'onnivoro' | 'pescetariano' | 'vegetariano' | 'vegano';
 
 export interface Profile {
@@ -20,7 +21,14 @@ export interface Profile {
   kcalAdjust?: number;
   lactoseFree: boolean;
   glutenFree: boolean;
-  excludedFoods: string[]; // id alimenti esclusi
+  excludedFoods: string[]; // id alimenti esclusi ("mai più")
+  /** alimenti preferiti: il generatore li propone più spesso */
+  favoriteFoods?: string[];
+  /** varietà del piano: bassa = meno alimenti diversi e spesa più semplice */
+  variety?: Variety;
+  /** giorni di allenamento (0 = Lunedì): più carboidrati, meno nei giorni di riposo */
+  trainingDays?: number[];
+  theme?: 'system' | 'light' | 'dark';
 }
 
 export interface FreeMeal {
@@ -132,7 +140,12 @@ export interface ExtraItem {
 export interface ShoppingState {
   checked: Record<string, boolean>;
   extras: ExtraItem[];
+  /** spesa divisa in due (Lun–Gio / Ven–Dom) */
+  split?: boolean;
 }
+
+/** alimenti che si hanno già in dispensa (esclusi dalla lista) */
+export type Pantry = Record<string, boolean>;
 
 // ---------- Diario dei pasti ----------
 export type MealStatus = 'done' | 'skipped' | 'other';
@@ -164,4 +177,16 @@ export interface Reminders {
   weigh: Reminder;
   mamma: Reminder;
   shopping: Reminder;
+}
+
+// ---------- Misure corporee ----------
+export interface Measurement {
+  date: string; // YYYY-MM-DD
+  waist?: number; // vita (cm, all'ombelico)
+  hips?: number; // fianchi
+  neck?: number; // collo (serve per la stima della % di grasso)
+  chest?: number;
+  arm?: number;
+  thigh?: number;
+  photoId?: string; // foto in IndexedDB
 }

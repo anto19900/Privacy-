@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FOODS } from '../lib/foods';
 import { ACTIVITY, calcTargets, DEFAULT_FREE_MEAL, DEFAULT_RATE, FREE_MEAL_SIZES, GOALS, RATE_OPTIONS } from '../lib/nutrition';
 import { fmt1 } from '../lib/format';
-import type { Activity, DietType, Goal, Profile } from '../lib/types';
+import type { Activity, DietType, Goal, Profile, Variety } from '../lib/types';
 
 export interface FieldsProps {
   value: Profile;
@@ -241,8 +241,12 @@ const DIETS: { id: DietType; label: string }[] = [
 
 export function PreferenceFields({ value: p, onChange }: FieldsProps) {
   const set = (patch: Partial<Profile>) => onChange({ ...p, ...patch });
-  const toggleFood = (id: string) =>
-    set({ excludedFoods: p.excludedFoods.includes(id) ? p.excludedFoods.filter((x) => x !== id) : [...p.excludedFoods, id] });
+  const favs = p.favoriteFoods ?? [];
+  const cycleFood = (id: string) => {
+    if (p.excludedFoods.includes(id)) set({ excludedFoods: p.excludedFoods.filter((x) => x !== id) });
+    else if (favs.includes(id)) set({ favoriteFoods: favs.filter((x) => x !== id), excludedFoods: [...p.excludedFoods, id] });
+    else set({ favoriteFoods: [...favs, id] });
+  };
 
   return (
     <div className="space-y-5">
@@ -268,22 +272,76 @@ export function PreferenceFields({ value: p, onChange }: FieldsProps) {
         </div>
       </div>
       <div>
-        <span className="label">Alimenti da escludere (tocca per escludere)</span>
+        <span className="label">Alimenti: tocca per ⭐ preferito, di nuovo per 🚫 mai più</span>
         <div className="flex flex-wrap gap-2">
           {FOODS.map((f) => {
             const off = p.excludedFoods.includes(f.id);
+            const fav = favs.includes(f.id);
             return (
               <button
                 key={f.id}
                 type="button"
-                onClick={() => toggleFood(f.id)}
-                className={`rounded-full border px-3 py-2 text-sm ${off ? 'border-rose-300 bg-rose-50 text-rose-700 line-through' : 'border-slate-200 bg-white text-slate-700'}`}
+                onClick={() => cycleFood(f.id)}
+                className={`rounded-full border px-3 py-2 text-sm ${
+                  off ? 'border-rose-300 bg-rose-50 text-rose-700 line-through' : fav ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-700'
+                }`}
               >
-                {f.emoji} {f.name}
+                {fav ? '⭐' : off ? '🚫' : f.emoji} {f.name}
               </button>
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+const VARIETY: { id: Variety; label: string; desc: string }[] = [
+  { id: 'alta', label: 'Alta', desc: 'Tanti alimenti diversi' },
+  { id: 'media', label: 'Media', desc: 'Equilibrio' },
+  { id: 'bassa', label: 'Bassa', desc: 'Pochi alimenti, colazione fissa, spesa semplice' },
+];
+
+/** Varietà del piano e giorni di allenamento. */
+export function PlanStyleFields({ value: p, onChange }: FieldsProps) {
+  const set = (patch: Partial<Profile>) => onChange({ ...p, ...patch });
+  const training = p.trainingDays ?? [];
+  const t = calcTargets(p);
+  const tDay = training.length ? t.perDay[training[0]] : null;
+  const restIdx = [0, 1, 2, 3, 4, 5, 6].find((i) => !training.includes(i) && i !== (p.freeMeal ?? DEFAULT_FREE_MEAL).day);
+  const rDay = restIdx !== undefined ? t.perDay[restIdx] : null;
+  return (
+    <div className="space-y-4">
+      <div>
+        <span className="label">Varietà del piano</span>
+        <div className="grid grid-cols-3 gap-2">
+          {VARIETY.map((v) => (
+            <button key={v.id} type="button" onClick={() => set({ variety: v.id })} className={`rounded-xl border p-2.5 text-left ${(p.variety ?? 'alta') === v.id ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}>
+              <p className="text-sm font-bold">{v.label}</p>
+              <p className="text-[11px] leading-tight opacity-80">{v.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <span className="label">🏋️ Giorni di allenamento (più carboidrati)</span>
+        <div className="grid grid-cols-7 gap-1">
+          {['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map((d, i) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => set({ trainingDays: training.includes(i) ? training.filter((x) => x !== i) : [...training, i].sort() })}
+              className={`rounded-lg border py-2.5 text-xs font-bold ${training.includes(i) ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+        {tDay && rDay && training.length < 7 && (
+          <p className="mt-2 rounded-xl bg-sage-50 p-3 text-sm text-slate-700">
+            Allenamento: <b>{tDay.kcal} kcal</b> (C {tDay.c}g) · Riposo: <b>{rDay.kcal} kcal</b> (C {rDay.c}g). Proteine e media settimanale invariate.
+          </p>
+        )}
       </div>
     </div>
   );

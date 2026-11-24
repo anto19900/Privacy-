@@ -24,6 +24,14 @@ App Android (React + TypeScript + Tailwind CSS + Capacitor) per:
   di peso × 7.700) con proposta di correzione delle calorie applicabile con un tocco (`src/lib/adaptive.ts`).
 - **Promemoria** (notifiche locali): pesata, menù a Mamma (apre già il messaggio del giorno dopo), spesa.
 
+- **Preferiti e "mai più"** dal tasto Cambia; **varietà** alta/media/bassa; **pasti ripetibili**
+  ("uguale a ieri", "ripeti questo pasto tutta la settimana").
+- **Giorni di allenamento**: +20% carboidrati, presi dai giorni di riposo (media settimanale e proteine invariate).
+- **Spesa smart**: confezioni reali, "ce l'ho già" in dispensa, spesa divisa Lun–Gio / Ven–Dom.
+- **Misure corporee e foto** (vita, fianchi, collo… % grasso stimata con formula US Navy, confronto foto).
+- **Backup** JSON (foto incluse a scelta) e **export CSV** di peso e misure.
+- Tema chiaro/scuro/sistema, icona e splash personalizzati.
+
 Funziona 100% offline: i dati restano nel `localStorage` del telefono.
 
 ## Struttura
@@ -44,6 +52,14 @@ npm install
 npm run dev        # anteprima nel browser
 npm run build      # typecheck + build in dist/
 ```
+
+## Test
+
+```bash
+npm test           # Vitest: calcoli, ottimizzatore macro, pasto libero, diario, spesa, export
+```
+
+`npm run build` esegue i test prima della build: se la precisione dei macro peggiora, la build si ferma.
 
 ## Generare l'APK
 
@@ -74,3 +90,26 @@ Installazione su telefono collegato via USB: `adb install -r android/app/build/o
 (oppure copia il file sul telefono e aprilo, abilitando "Installa app sconosciute").
 
 > Valori nutrizionali indicativi: l'app non sostituisce il parere di un medico o nutrizionista.
+
+## APK di release firmato
+
+La firma usa `android/keystore.properties` (non versionato) che punta al keystore in `android/keystore/`
+(anch'esso escluso da git). Con quei due file al loro posto:
+
+```bash
+npm run build && npx cap sync android
+cd android && ./gradlew assembleRelease
+# → android/app/build/outputs/apk/release/app-release.apk
+```
+
+Per il Play Store: `./gradlew bundleRelease` (file .aab). **Conserva il keystore e la password**:
+senza, non potrai pubblicare aggiornamenti della stessa app.
+
+Formato di `keystore.properties`:
+
+```
+storeFile=../keystore/dieta-spesa-release.jks
+storePassword=...
+keyAlias=dietaspesa
+keyPassword=...
+```

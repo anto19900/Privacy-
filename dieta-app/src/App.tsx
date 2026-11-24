@@ -1,16 +1,21 @@
 import { CalendarDays, Home, Scale, ShoppingCart, User } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { onReminderTap } from './lib/notifications';
+import { applyTheme, watchSystemTheme } from './lib/theme';
 import { todayIndex } from './lib/plan';
 import { useStore } from './lib/store';
-import { Onboarding } from './screens/Onboarding';
-import { ProfileScreen } from './screens/ProfileScreen';
-import { Shopping } from './screens/Shopping';
 import { Today } from './screens/Today';
 import { Week } from './screens/Week';
-import { Weight } from './screens/Weight';
+
+// schermate caricate solo quando servono (Recharts pesa: va in un chunk separato)
+const Onboarding = lazy(() => import('./screens/Onboarding').then((m) => ({ default: m.Onboarding })));
+const ProfileScreen = lazy(() => import('./screens/ProfileScreen').then((m) => ({ default: m.ProfileScreen })));
+const Shopping = lazy(() => import('./screens/Shopping').then((m) => ({ default: m.Shopping })));
+const Weight = lazy(() => import('./screens/Weight').then((m) => ({ default: m.Weight })));
+
+const Loading = () => <div className="flex h-40 items-center justify-center text-slate-400">Caricamento…</div>;
 
 type Tab = 'oggi' | 'settimana' | 'spesa' | 'peso' | 'profilo';
 
@@ -26,6 +31,11 @@ export default function App() {
   const { profile, plan } = useStore();
   const [tab, setTab] = useState<Tab>('oggi');
   const mainRef = useRef<HTMLElement>(null);
+  const theme = profile?.theme ?? 'system';
+  useEffect(() => {
+    applyTheme(theme);
+    return watchSystemTheme(theme, () => applyTheme(theme));
+  }, [theme]);
   // apertura da notifica "menù a Mamma": settimana sul giorno dopo, con il messaggio già pronto
   const [weekOpen, setWeekOpen] = useState<{ day: number; mamma: boolean; n: number } | null>(null);
 
@@ -58,16 +68,23 @@ export default function App() {
     };
   }, []);
 
-  if (!profile || !plan) return <Onboarding />;
+  if (!profile || !plan)
+    return (
+      <Suspense fallback={<Loading />}>
+        <Onboarding />
+      </Suspense>
+    );
 
   return (
     <div className="mx-auto flex h-full max-w-lg flex-col bg-sage-50">
       <main ref={mainRef} className="flex-1 overflow-y-auto px-4 pb-28 pt-[calc(1rem+env(safe-area-inset-top))]">
+        <Suspense fallback={<Loading />}>
         {tab === 'oggi' && <Today onOpenWeek={() => { setWeekOpen(null); setTab('settimana'); }} />}
         {tab === 'settimana' && <Week key={weekOpen?.n ?? 0} initialDay={weekOpen?.day} openMamma={weekOpen?.mamma} />}
         {tab === 'spesa' && <Shopping />}
         {tab === 'peso' && <Weight />}
         {tab === 'profilo' && <ProfileScreen />}
+        </Suspense>
       </main>
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
         <div className="mx-auto grid max-w-lg grid-cols-5">

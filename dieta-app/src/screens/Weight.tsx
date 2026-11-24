@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { Measurements } from './Measurements';
 import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { estimateAdaptive, MIN_DAYS, movingAverage } from '../lib/adaptive';
 import { buildForecast, toTime } from '../lib/forecast';
@@ -7,7 +8,7 @@ import { fmt1, fmtDate, isoDate } from '../lib/format';
 import { bmiLabel, bmiTone, calcBmi } from '../lib/nutrition';
 import { useStore } from '../lib/store';
 
-export function Weight() {
+function WeightView() {
   const { weights, profile, targets, plan, foodLog, addWeight, removeWeight, applyKcalAdjust } = useStore();
   const [date, setDate] = useState(isoDate());
   const [kg, setKg] = useState('');
@@ -56,8 +57,6 @@ export function Weight() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-extrabold text-slate-900">Il mio peso</h1>
-
       <form onSubmit={submit} className="card space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <label>
@@ -247,6 +246,23 @@ function AdaptiveCard({ estimate: e, weighIns, kcal, adjust, onApply, onReset }:
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+export function Weight() {
+  const [tab, setTab] = useState<'peso' | 'misure'>('peso');
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-extrabold text-slate-900">I miei progressi</h1>
+      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
+        {(['peso', 'misure'] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)} className={`rounded-xl py-2.5 text-sm font-bold ${tab === t ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>
+            {t === 'peso' ? '⚖️ Peso' : '📏 Misure e foto'}
+          </button>
+        ))}
+      </div>
+      {tab === 'peso' ? <WeightView /> : <Measurements />}
     </div>
   );
 }

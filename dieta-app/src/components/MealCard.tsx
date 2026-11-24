@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Check, CircleSlash, PencilLine, Undo2 } from 'lucide-react';
+import { ArrowLeftRight, Ban, Check, CircleSlash, PencilLine, Repeat, Star, Undo2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { logDone, logOther, logSkipped, mealMacros } from '../lib/diary';
 import { getFood } from '../lib/foods';
@@ -17,6 +17,8 @@ interface Props {
   onLog?: (log: MealLog | null) => void;
   /** il giorno è stato ribilanciato rispetto al piano */
   rebalanced?: boolean;
+  /** mostra "ripeti questo pasto tutta la settimana" */
+  onRepeat?: () => void;
 }
 
 const STATUS = {
@@ -25,8 +27,8 @@ const STATUS = {
   skipped: { label: 'Saltato', cls: 'bg-slate-200 text-slate-700', Icon: CircleSlash },
 } as const;
 
-export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced }: Props) {
-  const { profile, plan, targets, swap } = useStore();
+export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced, onRepeat }: Props) {
+  const { profile, plan, targets, swap, toggleFavorite, banFood } = useStore();
   const [editing, setEditing] = useState<number | null>(null);
   const [otherOpen, setOtherOpen] = useState(false);
   const info = MEALS[meal.key];
@@ -108,7 +110,21 @@ export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced }: Pr
         <h3 className="flex items-center gap-2 text-base font-bold text-slate-800">
           <span className="text-xl">{info.emoji}</span> {info.label}
         </h3>
-        <span className="rounded-full bg-sage-100 px-2.5 py-1 text-xs font-semibold text-sage-700">{Math.round(tot.kcal)} kcal</span>
+        <div className="flex items-center gap-1.5">
+          {onRepeat && (
+            <button
+              className="rounded-full p-2 text-slate-500 active:bg-slate-100"
+              aria-label="Ripeti in tutta la settimana"
+              title="Ripeti in tutta la settimana"
+              onClick={() => {
+                if (confirm(`Mettere questo ${info.label.toLowerCase()} (stessi alimenti) in tutti i giorni della settimana?`)) onRepeat();
+              }}
+            >
+              <Repeat size={18} />
+            </button>
+          )}
+          <span className="rounded-full bg-sage-100 px-2.5 py-1 text-xs font-semibold text-sage-700">{Math.round(tot.kcal)} kcal</span>
+        </div>
       </div>
       {rebalanced && !locked && (
         <p className="mb-1 rounded-lg bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700">↻ Grammature ribilanciate in base a quanto hai già mangiato oggi</p>
@@ -161,6 +177,27 @@ export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced }: Pr
                 <p className="text-sm text-emerald-700">{fmtQty(current.foodId, current.grams)} · attuale</p>
               </div>
               <Check className="text-emerald-600" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                className={`btn text-sm ${(profile?.favoriteFoods ?? []).includes(current.foodId) ? 'bg-amber-400 text-white' : 'border border-amber-200 bg-amber-50 text-amber-800'}`}
+                onClick={() => toggleFavorite(current.foodId)}
+              >
+                <Star size={18} fill={(profile?.favoriteFoods ?? []).includes(current.foodId) ? 'currentColor' : 'none'} />
+                {(profile?.favoriteFoods ?? []).includes(current.foodId) ? 'Preferito' : 'Più spesso'}
+              </button>
+              <button
+                className="btn border border-rose-200 bg-rose-50 text-sm text-rose-700"
+                onClick={() => {
+                  const name = getFood(current.foodId).name;
+                  if (confirm(`Non proporre mai più "${name}"? Verrà sostituito in tutta la settimana (puoi riattivarlo dal Profilo).`)) {
+                    banFood(current.foodId);
+                    setEditing(null);
+                  }
+                }}
+              >
+                <Ban size={18} /> Mai più
+              </button>
             </div>
             <p className="pt-1 text-center text-sm font-semibold uppercase tracking-wide text-slate-400">oppure</p>
             {alts.length === 0 && <p className="text-center text-slate-500">Nessuna alternativa compatibile con le tue preferenze.</p>}
