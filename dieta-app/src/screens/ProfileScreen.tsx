@@ -25,7 +25,10 @@ export function ProfileScreen() {
     <div className="space-y-5">
       <h1 className="text-2xl font-extrabold text-slate-900">Profilo</h1>
       <MacroSummary targets={t} />
-      <p className="-mt-2 text-xs text-slate-500">BMR {t.bmr} kcal · TDEE {t.tdee} kcal (Mifflin-St Jeor)</p>
+      <p className="-mt-2 text-xs text-slate-500">
+        BMR {t.bmr} kcal · TDEE {t.tdee} kcal (Mifflin-St Jeor)
+        {t.dailyDelta !== 0 && ` · ${t.dailyDelta < 0 ? 'deficit' : 'surplus'} ${Math.abs(t.dailyDelta)} kcal/giorno`}
+      </p>
 
       <Section title="Dati personali"><BasicFields value={draft} onChange={setDraft} /></Section>
       <Section title="Attività fisica"><ActivityFields value={draft} onChange={setDraft} /></Section>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FOODS } from '../lib/foods';
-import { ACTIVITY, GOALS } from '../lib/nutrition';
+import { ACTIVITY, calcTargets, DEFAULT_RATE, GOALS, RATE_OPTIONS } from '../lib/nutrition';
+import { fmt1 } from '../lib/format';
 import type { Activity, DietType, Goal, Profile } from '../lib/types';
 
 export interface FieldsProps {
@@ -98,6 +99,66 @@ export function GoalFields({ value: p, onChange }: FieldsProps) {
           </div>
         </button>
       ))}
+      {p.goal === 'dimagrimento' && <RateFields value={p} onChange={onChange} />}
+    </div>
+  );
+}
+
+/** Scelta del ritmo di calo settimanale con deficit e tempi stimati. */
+export function RateFields({ value: p, onChange }: FieldsProps) {
+  const rate = p.weeklyRateKg ?? DEFAULT_RATE;
+  const t = calcTargets({ ...p, weeklyRateKg: rate });
+  const realRate = -t.weeklyChangeKg;
+  const toLose = p.weightKg - p.goalWeightKg;
+  const weeks = toLose > 0 && realRate > 0 ? Math.ceil(toLose / realRate) : null;
+  const date = weeks ? new Date(Date.now() + weeks * 7 * 86_400_000) : null;
+
+  return (
+    <div className="card mt-3 space-y-3 border-emerald-200">
+      <div>
+        <p className="font-bold text-slate-800">Quanti kg vuoi perdere a settimana?</p>
+        <p className="text-xs text-slate-500">Valore teorico: 1 kg di grasso ≈ 7.700 kcal di deficit.</p>
+      </div>
+      <div className="grid grid-cols-5 gap-1.5">
+        {RATE_OPTIONS.map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => onChange({ ...p, weeklyRateKg: r })}
+            className={`rounded-xl border py-3 text-sm font-bold ${rate === r ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+          >
+            {r.toLocaleString('it-IT', { maximumFractionDigits: 2 })}
+            <span className="block text-[10px] font-medium opacity-80">kg</span>
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-center">
+        <div className="rounded-xl bg-rose-50 p-2.5">
+          <p className="text-lg font-extrabold text-rose-600">−{Math.abs(t.dailyDelta)}</p>
+          <p className="text-xs text-slate-500">kcal/giorno di deficit</p>
+        </div>
+        <div className="rounded-xl bg-emerald-50 p-2.5">
+          <p className="text-lg font-extrabold text-emerald-700">{t.kcal}</p>
+          <p className="text-xs text-slate-500">kcal/giorno da mangiare</p>
+        </div>
+      </div>
+      {weeks && date && (
+        <p className="rounded-xl bg-sage-50 p-3 text-sm text-slate-700">
+          📅 Obiettivo <b>{fmt1(p.goalWeightKg)} kg</b> in circa <b>{weeks} settimane</b>, verso il{' '}
+          <b>{date.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}</b>.
+        </p>
+      )}
+      {t.floorApplied && (
+        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+          ⚠️ Per sicurezza non scendiamo sotto {p.sex === 'M' ? '1500' : '1200'} kcal: il calo reale stimato è di circa{' '}
+          <b>{fmt1(realRate)} kg/settimana</b>.
+        </p>
+      )}
+      {rate >= 1.25 && !t.floorApplied && (
+        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+          ⚠️ Ritmo impegnativo: è consigliabile farsi seguire da un professionista.
+        </p>
+      )}
     </div>
   );
 }
@@ -176,6 +237,7 @@ export const DEFAULT_PROFILE: Profile = {
   goalWeightKg: 60,
   activity: 'leggero',
   goal: 'dimagrimento',
+  weeklyRateKg: DEFAULT_RATE,
   diet: 'onnivoro',
   lactoseFree: false,
   glutenFree: false,

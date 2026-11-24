@@ -12,6 +12,8 @@ export interface Profile {
   goalWeightKg: number;
   activity: Activity;
   goal: Goal;
+  /** Kg da perdere a settimana (solo per Dimagrimento): 0.5 – 1.5 */
+  weeklyRateKg?: number;
   diet: DietType;
   lactoseFree: boolean;
   glutenFree: boolean;
@@ -22,6 +24,12 @@ export interface Targets {
   bmr: number;
   tdee: number;
   kcal: number;
+  /** kcal/giorno rispetto al TDEE (negativo = deficit) */
+  dailyDelta: number;
+  /** Variazione di peso teorica a settimana (kg, negativa = calo) */
+  weeklyChangeKg: number;
+  /** true se le calorie sono state alzate al minimo di sicurezza */
+  floorApplied: boolean;
   proteinG: number;
   carbsG: number;
   fatG: number;

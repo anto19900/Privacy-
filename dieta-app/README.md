@@ -3,13 +3,15 @@
 App Android (React + TypeScript + Tailwind CSS + Capacitor) per:
 
 - **Profilo e fabbisogno**: wizard iniziale, BMR (Mifflin-St Jeor), TDEE, calorie target e macro.
+  Per il dimagrimento scegli il ritmo (0,5–1,5 kg/settimana): deficit = kg × 7.700 / 7 kcal al giorno.
 - **Piano settimanale** Lun–Dom, 5 pasti al giorno, con alimenti generici a *cluster*
   (carboidrati, proteine, verdure, grassi, frutta…) e grammature calcolate sul fabbisogno.
 - **Tasto "Cambia"** su ogni alimento: alternative dello stesso cluster con grammature isocaloriche.
 - **"Invia Pranzo e Cena a Mamma"**: messaggio pronto per WhatsApp / Telegram / condivisione Android / copia testo,
   per il singolo giorno o per tutta la settimana.
 - **Lista della spesa** automatica per reparto, aggiornata con i cambi, spunte, voci extra e condivisione.
-- **Peso**: registrazione, grafico Recharts con linea obiettivo, variazione, BMI e distanza dall'obiettivo.
+- **Peso**: registrazione, grafico Recharts con linea obiettivo e **previsione** tratteggiata fino al peso obiettivo
+  (data stimata di arrivo), variazione, BMI e distanza dall'obiettivo.
 
 Funziona 100% offline: i dati restano nel `localStorage` del telefono.
 

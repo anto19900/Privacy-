@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { ActivityFields, BasicFields, DEFAULT_PROFILE, GoalFields, PreferenceFields, validateBasics } from '../components/ProfileFields';
 import { calcTargets, GOALS } from '../lib/nutrition';
+import { fmt1 } from '../lib/format';
 import { useStore } from '../lib/store';
 import type { Profile } from '../lib/types';
 
@@ -71,6 +72,13 @@ export function Onboarding() {
               <p className="text-sm text-slate-500">Calorie giornaliere consigliate</p>
               <p className="text-5xl font-extrabold text-emerald-700">{t.kcal}</p>
               <p className="text-sm text-slate-500">kcal · {GOALS[p.goal].label}</p>
+              {t.dailyDelta !== 0 && (
+                <p className="mt-2 text-sm font-medium text-slate-700">
+                  {t.dailyDelta < 0 ? `Deficit di ${-t.dailyDelta} kcal/giorno` : `Surplus di ${t.dailyDelta} kcal/giorno`} ·{' '}
+                  {t.weeklyChangeKg < 0 ? '−' : '+'}
+                  {fmt1(Math.abs(t.weeklyChangeKg))} kg/settimana
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
               <Stat label="Proteine" value={`${t.proteinG}g`} />
