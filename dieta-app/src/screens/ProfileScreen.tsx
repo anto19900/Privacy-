@@ -1,7 +1,7 @@
 import { Save } from 'lucide-react';
 import { useState } from 'react';
 import { MacroSummary } from '../components/MacroSummary';
-import { ActivityFields, BasicFields, GoalFields, PreferenceFields, validateBasics } from '../components/ProfileFields';
+import { ActivityFields, BasicFields, FreeMealFields, GoalFields, PreferenceFields, validateBasics } from '../components/ProfileFields';
 import { calcTargets } from '../lib/nutrition';
 import { useStore } from '../lib/store';
 import type { Profile } from '../lib/types';
@@ -24,7 +24,15 @@ export function ProfileScreen() {
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-extrabold text-slate-900">Profilo</h1>
-      <MacroSummary targets={t} />
+      <MacroSummary
+        title="Media giornaliera settimanale"
+        target={{ kcal: t.kcal, p: t.proteinG, c: t.carbsG, f: t.fatG }}
+        note={
+          t.freeMeal
+            ? `Giorni normali: ${t.perDay[(t.freeMeal.day + 1) % 7].kcal} kcal (P ${t.perDay[(t.freeMeal.day + 1) % 7].p}g · C ${t.perDay[(t.freeMeal.day + 1) % 7].c}g · G ${t.perDay[(t.freeMeal.day + 1) % 7].f}g) + pasto libero ~${t.freeMeal.kcal} kcal.`
+            : undefined
+        }
+      />
       <p className="-mt-2 text-xs text-slate-500">
         BMR {t.bmr} kcal · TDEE {t.tdee} kcal (Mifflin-St Jeor)
         {t.dailyDelta !== 0 && ` · ${t.dailyDelta < 0 ? 'deficit' : 'surplus'} ${Math.abs(t.dailyDelta)} kcal/giorno`}
@@ -33,6 +41,7 @@ export function ProfileScreen() {
       <Section title="Dati personali"><BasicFields value={draft} onChange={setDraft} /></Section>
       <Section title="Attività fisica"><ActivityFields value={draft} onChange={setDraft} /></Section>
       <Section title="Obiettivo"><GoalFields value={draft} onChange={setDraft} /></Section>
+      <Section title="Pasto libero"><FreeMealFields value={draft} onChange={setDraft} /></Section>
       <Section title="Preferenze alimentari"><PreferenceFields value={draft} onChange={setDraft} /></Section>
 
       {msg && <p className={`rounded-xl p-3 text-sm font-medium ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-700'}`}>{msg.text}</p>}

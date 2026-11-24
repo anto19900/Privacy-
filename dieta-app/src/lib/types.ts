@@ -15,9 +15,24 @@ export interface Profile {
   /** Kg da perdere a settimana (solo per Dimagrimento): 0.5 – 1.5 */
   weeklyRateKg?: number;
   diet: DietType;
+  freeMeal?: FreeMeal;
   lactoseFree: boolean;
   glutenFree: boolean;
   excludedFoods: string[]; // id alimenti esclusi
+}
+
+export interface FreeMeal {
+  enabled: boolean;
+  day: number; // 0 = Lunedì
+  meal: 'pranzo' | 'cena';
+  kcal: number; // stima calorie del pasto libero
+}
+
+export interface MacroTarget {
+  kcal: number;
+  p: number;
+  c: number;
+  f: number;
 }
 
 export interface Targets {
@@ -30,9 +45,14 @@ export interface Targets {
   weeklyChangeKg: number;
   /** true se le calorie sono state alzate al minimo di sicurezza */
   floorApplied: boolean;
+  /** media giornaliera settimanale (pasto libero incluso) */
   proteinG: number;
   carbsG: number;
   fatG: number;
+  /** target dei pasti pianificati per ogni giorno (0 = Lunedì), pasto libero escluso */
+  perDay: MacroTarget[];
+  /** pasto libero effettivo (null se disattivato) */
+  freeMeal: (FreeMeal & { capped: boolean }) | null;
 }
 
 export type Cluster =
@@ -43,7 +63,9 @@ export type Cluster =
   | 'colazioneCarb'
   | 'colazioneProt'
   | 'fruit'
-  | 'snack';
+  | 'snack'
+  | 'snackCarb'
+  | 'topping';
 
 export type Department = 'ortofrutta' | 'macelleria' | 'dispensa' | 'latticini';
 
@@ -80,6 +102,8 @@ export interface MealItem {
 export interface Meal {
   key: MealKey;
   items: MealItem[];
+  /** pasto libero: nessun alimento pianificato */
+  free?: boolean;
 }
 
 export interface DayPlan {
@@ -87,8 +111,8 @@ export interface DayPlan {
 }
 
 export interface WeekPlan {
+  version: number;
   createdAt: string;
-  kcalTarget: number;
   days: DayPlan[]; // 0 = Lunedì
 }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FOODS } from '../lib/foods';
-import { ACTIVITY, calcTargets, DEFAULT_RATE, GOALS, RATE_OPTIONS } from '../lib/nutrition';
+import { ACTIVITY, calcTargets, DEFAULT_FREE_MEAL, DEFAULT_RATE, FREE_MEAL_SIZES, GOALS, RATE_OPTIONS } from '../lib/nutrition';
 import { fmt1 } from '../lib/format';
 import type { Activity, DietType, Goal, Profile } from '../lib/types';
 
@@ -163,6 +163,75 @@ export function RateFields({ value: p, onChange }: FieldsProps) {
   );
 }
 
+const DAY_SHORT = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+
+/** Pasto libero settimanale: giorno, pasto e dimensione, conteggiato nel bilancio della settimana. */
+export function FreeMealFields({ value: p, onChange }: FieldsProps) {
+  const fm = p.freeMeal ?? DEFAULT_FREE_MEAL;
+  const set = (patch: Partial<typeof fm>) => onChange({ ...p, freeMeal: { ...fm, ...patch } });
+  const t = calcTargets({ ...p, freeMeal: fm });
+  const normal = t.perDay[(fm.day + 1) % 7];
+
+  return (
+    <div className="card space-y-4">
+      <button type="button" onClick={() => set({ enabled: !fm.enabled })} className="flex w-full items-center justify-between text-left">
+        <div>
+          <p className="font-bold text-slate-800">🍕 Un pasto libero a settimana</p>
+          <p className="text-sm text-slate-500">Pizza, cena fuori… senza pesare nulla</p>
+        </div>
+        <span className={`flex h-8 w-14 items-center rounded-full p-1 transition ${fm.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+          <span className={`h-6 w-6 rounded-full bg-white shadow transition ${fm.enabled ? 'translate-x-6' : ''}`} />
+        </span>
+      </button>
+      {fm.enabled && (
+        <>
+          <div>
+            <span className="label">Giorno</span>
+            <div className="grid grid-cols-7 gap-1">
+              {DAY_SHORT.map((d, i) => (
+                <button key={d} type="button" onClick={() => set({ day: i })} className={`rounded-lg border py-2.5 text-xs font-bold ${fm.day === i ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}>
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="label">Pasto</span>
+            <div className="grid grid-cols-2 gap-2">
+              {(['pranzo', 'cena'] as const).map((m) => (
+                <button key={m} type="button" className={fm.meal === m ? 'chip-on' : 'chip-off'} onClick={() => set({ meal: m })}>
+                  {m === 'pranzo' ? '☀️ Pranzo' : '🌙 Cena'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="label">Quanto abbondante?</span>
+            <div className="grid grid-cols-3 gap-2">
+              {FREE_MEAL_SIZES.map((sz) => (
+                <button key={sz.kcal} type="button" onClick={() => set({ kcal: sz.kcal })} className={`rounded-xl border py-2.5 text-sm font-semibold ${fm.kcal === sz.kcal ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}>
+                  {sz.label}
+                  <span className="block text-[11px] font-normal opacity-80">{sz.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="rounded-xl bg-sage-50 p-3 text-sm text-slate-700">
+            ⚖️ Per compensare, gli altri giorni scendono a <b>{normal.kcal} kcal</b> (da {t.kcal}): le proteine restano a{' '}
+            <b>{normal.p}g</b>, si riducono un po' carboidrati e grassi. La media settimanale resta {t.kcal} kcal.
+          </p>
+          {t.freeMeal?.capped && (
+            <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+              ⚠️ Con le tue calorie non si può scendere oltre negli altri giorni: il pasto libero è limitato a circa{' '}
+              <b>{t.freeMeal.kcal} kcal</b>.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 const DIETS: { id: DietType; label: string }[] = [
   { id: 'onnivoro', label: '🍖 Onnivoro' },
   { id: 'pescetariano', label: '🐟 Pescetariano' },
@@ -238,6 +307,7 @@ export const DEFAULT_PROFILE: Profile = {
   activity: 'leggero',
   goal: 'dimagrimento',
   weeklyRateKg: DEFAULT_RATE,
+  freeMeal: DEFAULT_FREE_MEAL,
   diet: 'onnivoro',
   lactoseFree: false,
   glutenFree: false,

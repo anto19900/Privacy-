@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { useState } from 'react';
-import { ActivityFields, BasicFields, DEFAULT_PROFILE, GoalFields, PreferenceFields, validateBasics } from '../components/ProfileFields';
+import { ActivityFields, BasicFields, DEFAULT_PROFILE, FreeMealFields, GoalFields, PreferenceFields, validateBasics } from '../components/ProfileFields';
 import { calcTargets, GOALS } from '../lib/nutrition';
 import { fmt1 } from '../lib/format';
 import { useStore } from '../lib/store';
@@ -65,7 +65,12 @@ export function Onboarding() {
         {step === 0 && <BasicFields value={p} onChange={setP} />}
         {step === 1 && <ActivityFields value={p} onChange={setP} />}
         {step === 2 && <GoalFields value={p} onChange={setP} />}
-        {step === 3 && <PreferenceFields value={p} onChange={setP} />}
+        {step === 3 && (
+          <div className="space-y-5">
+            <PreferenceFields value={p} onChange={setP} />
+            <FreeMealFields value={p} onChange={setP} />
+          </div>
+        )}
         {step === 4 && (
           <div className="space-y-3">
             <div className="card text-center">

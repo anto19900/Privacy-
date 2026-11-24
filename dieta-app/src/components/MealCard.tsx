@@ -1,5 +1,5 @@
 import { ArrowLeftRight, Check } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { getFood } from '../lib/foods';
 import { fmtQty } from '../lib/format';
 import { alternativesFor, CLUSTER_LABEL, MEALS, sumMacros } from '../lib/plan';
@@ -14,12 +14,30 @@ interface Props {
 }
 
 export function MealCard({ meal, dayIndex, compact }: Props) {
-  const { profile, swap } = useStore();
+  const { profile, plan, targets, swap } = useStore();
   const [editing, setEditing] = useState<number | null>(null);
   const info = MEALS[meal.key];
   const tot = sumMacros(meal.items);
-  const current: MealItem | null = editing !== null ? meal.items[editing] : null;
-  const alts = current && profile ? alternativesFor(current, profile) : [];
+  const current: MealItem | null = editing !== null ? meal.items[editing] ?? null : null;
+  const day = plan?.days[dayIndex];
+  const alts = useMemo(
+    () => (editing !== null && day && profile && targets ? alternativesFor(day, meal.key, editing, profile, targets.perDay[dayIndex]) : []),
+    [editing, day, profile, targets, meal.key, dayIndex],
+  );
+
+  if (meal.free) {
+    return (
+      <div className="card border-2 border-dashed border-amber-300 bg-amber-50/60">
+        <h3 className="flex items-center gap-2 text-base font-bold text-slate-800">
+          <span className="text-xl">🍕</span> {info.label}: pasto libero
+        </h3>
+        <p className="mt-1 text-sm text-slate-600">
+          Goditelo senza pesare nulla! Circa <b>{targets?.freeMeal?.kcal ?? 900} kcal</b>, già conteggiate nel bilancio
+          settimanale: gli altri giorni sono leggermente ridotti per compensare.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="card">
@@ -64,7 +82,7 @@ export function MealCard({ meal, dayIndex, compact }: Props) {
         open={current !== null}
         onClose={() => setEditing(null)}
         title="Alternative equivalenti"
-        subtitle={current ? `${CLUSTER_LABEL[current.cluster]} · grammature ricalcolate a parità di calorie` : ''}
+        subtitle={current ? `${CLUSTER_LABEL[current.cluster]} · grammature ricalcolate per restare nei tuoi macro` : ''}
       >
         {current && (
           <div className="space-y-2">
@@ -78,6 +96,9 @@ export function MealCard({ meal, dayIndex, compact }: Props) {
             </div>
             <p className="pt-1 text-center text-sm font-semibold uppercase tracking-wide text-slate-400">oppure</p>
             {alts.length === 0 && <p className="text-center text-slate-500">Nessuna alternativa compatibile con le tue preferenze.</p>}
+            {alts.length > 0 && (
+              <p className="text-center text-xs text-slate-400">Scegliendo un'alternativa, le altre grammature del giorno si adattano leggermente per mantenere proteine, carboidrati e grassi.</p>
+            )}
             {alts.map((a) => {
               const f = getFood(a.foodId);
               return (
@@ -92,7 +113,10 @@ export function MealCard({ meal, dayIndex, compact }: Props) {
                   <span className="text-2xl">{f.emoji}</span>
                   <div className="flex-1">
                     <p className="font-semibold text-slate-800">{f.name}</p>
-                    <p className="text-sm text-slate-500">{Math.round((f.kcal * a.grams) / 100)} kcal</p>
+                    <p className="text-xs text-slate-500">
+                      {Math.round((f.kcal * a.grams) / 100)} kcal · P {Math.round((f.p * a.grams) / 100)} · C {Math.round((f.c * a.grams) / 100)} · G{' '}
+                      {Math.round((f.f * a.grams) / 100)}
+                    </p>
                   </div>
                   <span className="rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-bold text-white">{fmtQty(a.foodId, a.grams)}</span>
                 </button>

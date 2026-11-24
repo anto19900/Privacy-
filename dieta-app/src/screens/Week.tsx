@@ -1,5 +1,6 @@
 import { RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { MacroSummary } from '../components/MacroSummary';
 import { MammaButton } from '../components/MammaButton';
 import { MealCard } from '../components/MealCard';
 import { ShareSheet } from '../components/ShareSheet';
@@ -8,7 +9,7 @@ import { dayItems, DAYS, sumMacros, todayIndex } from '../lib/plan';
 import { useStore } from '../lib/store';
 
 export function Week() {
-  const { plan, profile, regenerate } = useStore();
+  const { plan, profile, targets, regenerate } = useStore();
   const [sel, setSel] = useState(todayIndex());
   const [share, setShare] = useState<'day' | 'week' | null>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -17,9 +18,9 @@ export function Week() {
     tabsRef.current?.querySelector<HTMLElement>(`[data-day="${sel}"]`)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   }, [sel]);
 
-  if (!plan || !profile) return null;
+  if (!plan || !profile || !targets) return null;
   const day = plan.days[sel];
-  const kcal = sumMacros(dayItems(day)).kcal;
+  const totals = sumMacros(dayItems(day));
   const today = todayIndex();
 
   return (
@@ -53,9 +54,12 @@ export function Week() {
         ))}
       </div>
 
-      <p className="text-sm text-slate-500">
-        <b className="text-slate-800">{DAYS[sel]}</b> · {Math.round(kcal)} kcal (obiettivo {plan.kcalTarget})
-      </p>
+      <MacroSummary
+        title={`${DAYS[sel]} · calorie del piano`}
+        target={targets.perDay[sel]}
+        actual={totals}
+        note={targets.freeMeal && targets.freeMeal.day === sel ? `Pasto libero (~${targets.freeMeal.kcal} kcal) escluso dai totali.` : undefined}
+      />
 
       <MammaButton onClick={() => setShare('day')} label={`Invia Pranzo e Cena di ${DAYS[sel]} a Mamma`} />
       <button className="btn-soft w-full" onClick={() => setShare('week')}>
@@ -70,7 +74,7 @@ export function Week() {
         open={share !== null}
         onClose={() => setShare(null)}
         title={share === 'week' ? 'Settimana per Mamma' : `${DAYS[sel]} per Mamma`}
-        text={share === 'week' ? weekMessage(plan.days) : dayMessage(day, sel, profile, sel === today)}
+        text={share === 'week' ? weekMessage(plan.days) : share === 'day' ? dayMessage(day, sel, profile, targets.perDay[sel], sel === today) : ''}
       />
     </div>
   );

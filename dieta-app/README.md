@@ -6,7 +6,12 @@ App Android (React + TypeScript + Tailwind CSS + Capacitor) per:
   Per il dimagrimento scegli il ritmo (0,5–1,5 kg/settimana): deficit = kg × 7.700 / 7 kcal al giorno.
 - **Piano settimanale** Lun–Dom, 5 pasti al giorno, con alimenti generici a *cluster*
   (carboidrati, proteine, verdure, grassi, frutta…) e grammature calcolate sul fabbisogno.
-- **Tasto "Cambia"** su ogni alimento: alternative dello stesso cluster con grammature isocaloriche.
+- **Ottimizzatore macro** (`src/lib/solver.ts`): per ogni giorno le grammature sono calcolate con minimi quadrati
+  vincolati per centrare insieme proteine, carboidrati, grassi e kcal (tipicamente entro pochi grammi).
+- **Tasto "Cambia"** su ogni alimento: alternative dello stesso cluster; dopo il cambio il giorno viene
+  ri-ottimizzato per restare nei macro. ~90 alimenti generici con varianti (senza lattosio/glutine, vegani).
+- **Pasto libero settimanale** (giorno, pranzo/cena, ~600/900/1200 kcal): conteggiato nel bilancio
+  settimanale riducendo carboidrati e grassi negli altri giorni, proteine invariate.
 - **"Invia Pranzo e Cena a Mamma"**: messaggio pronto per WhatsApp / Telegram / condivisione Android / copia testo,
   per il singolo giorno o per tutta la settimana.
 - **Lista della spesa** automatica per reparto, aggiornata con i cambi, spunte, voci extra e condivisione.

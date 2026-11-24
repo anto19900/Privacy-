@@ -26,7 +26,15 @@ export function Today({ onOpenWeek }: { onOpenWeek: () => void }) {
       </div>
 
       <MammaButton onClick={() => setShare(true)} />
-      <MacroSummary targets={targets} actual={totals} />
+      <MacroSummary
+        target={targets.perDay[d]}
+        actual={totals}
+        note={
+          targets.freeMeal && targets.freeMeal.day === d
+            ? `Oggi c'è il pasto libero (~${targets.freeMeal.kcal} kcal), escluso da questi totali.`
+            : undefined
+        }
+      />
 
       {day.meals.map((m) => (
         <MealCard key={m.key} meal={m} dayIndex={d} />
@@ -36,7 +44,7 @@ export function Today({ onOpenWeek }: { onOpenWeek: () => void }) {
         <CalendarDays size={20} /> Vedi tutta la settimana
       </button>
 
-      <ShareSheet open={share} onClose={() => setShare(false)} title="Menù di oggi per Mamma" text={dayMessage(day, d, profile, true)} />
+      <ShareSheet open={share} onClose={() => setShare(false)} title="Menù di oggi per Mamma" text={share ? dayMessage(day, d, profile, targets.perDay[d], true) : ''} />
     </div>
   );
 }

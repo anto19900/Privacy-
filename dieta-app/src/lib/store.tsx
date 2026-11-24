@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { calcTargets } from './nutrition';
-import { generateWeek, swapItem } from './plan';
+import { generateWeek, PLAN_VERSION, swapInDay } from './plan';
 import { clearAll, load, save } from './storage';
 import { isoDate } from './format';
 import type { ExtraItem, MealKey, Profile, ShoppingState, Targets, WeekPlan, WeightEntry } from './types';
@@ -28,7 +28,13 @@ const Ctx = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(() => load<Profile | null>('profile', null));
-  const [plan, setPlan] = useState<WeekPlan | null>(() => load<WeekPlan | null>('plan', null));
+  const [plan, setPlan] = useState<WeekPlan | null>(() => {
+    const saved = load<WeekPlan | null>('plan', null);
+    const prof = load<Profile | null>('profile', null);
+    // piano creato con una versione precedente dell'algoritmo: lo rigenera rispettando i macro
+    if (prof && (!saved || saved.version !== PLAN_VERSION)) return generateWeek(prof);
+    return saved;
+  });
   const [weights, setWeights] = useState<WeightEntry[]>(() => load<WeightEntry[]>('weights', []));
   const [shopping, setShopping] = useState<ShoppingState>(() => load<ShoppingState>('shopping', { checked: {}, extras: [] }));
 
@@ -48,7 +54,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const first = profile === null;
       setProfile(p);
       if (regenerate || first) {
-        setPlan(generateWeek(p, calcTargets(p).kcal));
+        setPlan(generateWeek(p));
         setShopping((s) => ({ ...s, checked: {} }));
       }
       if (first) upsertWeight(isoDate(), p.weightKg);
@@ -58,25 +64,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const regenerate = useCallback(() => {
     if (!profile) return;
-    setPlan(generateWeek(profile, calcTargets(profile).kcal));
+    setPlan(generateWeek(profile));
     setShopping((s) => ({ ...s, checked: {} }));
   }, [profile]);
 
-  const swap = useCallback((day: number, mealKey: MealKey, itemIndex: number, foodId: string) => {
-    setPlan((pl) => {
-      if (!pl) return pl;
-      const days = pl.days.map((d, di) =>
-        di !== day
-          ? d
-          : {
-              meals: d.meals.map((m) =>
-                m.key !== mealKey ? m : { ...m, items: m.items.map((it, ii) => (ii === itemIndex ? swapItem(it, foodId) : it)) },
-              ),
-            },
-      );
-      return { ...pl, days };
-    });
-  }, []);
+  const swap = useCallback(
+    (day: number, mealKey: MealKey, itemIndex: number, foodId: string) => {
+      if (!targets) return;
+      setPlan((pl) => {
+        if (!pl) return pl;
+        const days = pl.days.map((d, di) => (di === day ? swapInDay(d, mealKey, itemIndex, foodId, targets.perDay[di]) : d));
+        return { ...pl, days };
+      });
+    },
+    [targets],
+  );
 
   const value: Store = {
     profile,
