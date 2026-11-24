@@ -54,4 +54,6 @@
     <!-- Promemoria locali (pesata, menù a Mamma, spesa) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- promemoria del farmaco all'orario esatto (l'utente lo abilita in "Sveglie e promemoria") -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 </manifest>

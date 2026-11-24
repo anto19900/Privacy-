@@ -5,8 +5,9 @@ import { clearAll, importBackup, load, save } from './storage';
 import { restorePhotos } from './backup';
 import { clearPhotos, deletePhoto } from './photos';
 import { isoDate } from './format';
-import { applyReminders, DEFAULT_REMINDERS, type ApplyResult } from './notifications';
-import type { ExtraItem, FoodLog, Measurement, Pantry, MealKey, MealLog, Profile, Reminders, ShoppingState, Targets, WeekPlan, WeightEntry } from './types';
+import { applyReminders, applyTherapy, DEFAULT_REMINDERS, type ApplyResult } from './notifications';
+import { EMPTY_THERAPY } from './therapy';
+import type { ExtraItem, FoodLog, Measurement, Pantry, Therapy, TherapyLog, MealKey, MealLog, Profile, Reminders, ShoppingState, Targets, WeekPlan, WeightEntry } from './types';
 
 interface Store {
   profile: Profile | null;
@@ -36,6 +37,10 @@ interface Store {
   repeatMealAllWeek: (day: number, meal: MealKey) => void;
   updateProfile: (patch: Partial<Profile>) => void;
   importAll: (data: Record<string, unknown>) => Promise<void>;
+  therapy: Therapy;
+  therapyLog: TherapyLog;
+  saveTherapy: (t: Therapy) => Promise<ApplyResult>;
+  markTherapy: (date: string, taken: boolean) => void;
   measurements: Measurement[];
   saveMeasurement: (m: Measurement) => void;
   removeMeasurement: (date: string) => void;
@@ -58,6 +63,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [weights, setWeights] = useState<WeightEntry[]>(() => load<WeightEntry[]>('weights', []));
   const [shopping, setShopping] = useState<ShoppingState>(() => load<ShoppingState>('shopping', { checked: {}, extras: [] }));
 
+  const [therapy, setTherapy] = useState<Therapy>(() => load<Therapy>('therapy', EMPTY_THERAPY));
+  const [therapyLog, setTherapyLog] = useState<TherapyLog>(() => load<TherapyLog>('therapyLog', {}));
+  useEffect(() => save('therapy', therapy), [therapy]);
+  useEffect(() => save('therapyLog', therapyLog), [therapyLog]);
+  // ripianifica le notifiche a ogni avvio e quando cambiano terapia o prese
+  // (così una dose segnata come presa non fa più suonare il promemoria di quel giorno)
+  useEffect(() => {
+    if (therapy.enabled) void applyTherapy(therapy, therapyLog);
+  }, [therapy, therapyLog]);
   const [measurements, setMeasurements] = useState<Measurement[]>(() => load<Measurement[]>('measurements', []));
   useEffect(() => save('measurements', measurements), [measurements]);
   const [pantry, setPantry] = useState<Pantry>(() => load<Pantry>('pantry', {}));
@@ -187,6 +201,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value: Store = {
+    therapy,
+    therapyLog,
+    saveTherapy: async (t) => {
+      setTherapy(t);
+      return applyTherapy(t, therapyLog);
+    },
+    markTherapy: (date, taken) =>
+      setTherapyLog((l) => {
+        const n = { ...l };
+        if (taken) n[date] = true;
+        else delete n[date];
+        return n;
+      }),
     measurements,
     saveMeasurement: (m) =>
       setMeasurements((ms) => [...ms.filter((x) => x.date !== m.date), m].sort((a, b) => a.date.localeCompare(b.date))),
@@ -240,6 +267,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setFoodLog({});
       setPantry({});
       setMeasurements([]);
+      setTherapy(EMPTY_THERAPY);
+      setTherapyLog({});
+      void applyTherapy(EMPTY_THERAPY, {});
       void clearPhotos().catch(() => undefined);
       void setReminders(DEFAULT_REMINDERS);
     },

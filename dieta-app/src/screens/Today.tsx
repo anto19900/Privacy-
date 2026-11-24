@@ -4,6 +4,7 @@ import { MacroSummary } from '../components/MacroSummary';
 import { MammaButton } from '../components/MammaButton';
 import { MealCard } from '../components/MealCard';
 import { ShareSheet } from '../components/ShareSheet';
+import { TherapyCard } from '../components/Therapy';
 import { dayTotals, effectiveDay, lastWeek, sumLogs, type DayStatus } from '../lib/diary';
 import { isoDate } from '../lib/format';
 import { dayMessage } from '../lib/messages';
@@ -43,6 +44,7 @@ export function Today({ onOpenWeek }: { onOpenWeek: () => void }) {
         <h1 className="text-2xl font-extrabold text-slate-900">Ciao{profile.name ? ` ${profile.name.trim()}` : ''}! 👋</h1>
       </div>
 
+      <TherapyCard />
       <MammaButton onClick={() => setShare(true)} />
       <MacroSummary
         title={rebalanced ? 'Totale di oggi (ribilanciato)' : 'Calorie del piano'}

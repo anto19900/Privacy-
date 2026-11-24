@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import type { Reminder, Reminders } from './types';
+import { THERAPY_ID_BASE, THERAPY_ID_MAX, therapyNotifications } from './therapy';
+import type { Reminder, Reminders, Therapy, TherapyLog } from './types';
 
 export const DEFAULT_REMINDERS: Reminders = {
   weigh: { enabled: false, weekday: 0, hour: 7, minute: 30 },
@@ -71,4 +72,56 @@ export function onReminderTap(cb: (tab: string) => void): () => void {
   return () => {
     void h.then((l) => l.remove());
   };
+}
+
+// ---------- Terapia ----------
+
+const THERAPY_CHANNEL = 'terapia';
+
+/** Ripianifica tutte le notifiche della terapia (cancellando le precedenti). */
+export async function applyTherapy(t: Therapy, log: TherapyLog): Promise<ApplyResult> {
+  if (!notificationsSupported()) return 'unsupported';
+  try {
+    const pending = await LocalNotifications.getPending();
+    const old = pending.notifications.filter((n) => n.id >= THERAPY_ID_BASE && n.id <= THERAPY_ID_MAX).map((n) => ({ id: n.id }));
+    if (old.length) await LocalNotifications.cancel({ notifications: old });
+    if (!t.enabled) return 'ok';
+
+    let perm = await LocalNotifications.checkPermissions();
+    if (perm.display !== 'granted') perm = await LocalNotifications.requestPermissions();
+    if (perm.display !== 'granted') return 'denied';
+    await LocalNotifications.createChannel({ id: THERAPY_CHANNEL, name: 'Terapia', description: 'Promemoria del farmaco', importance: 5, vibration: true });
+
+    const list = therapyNotifications(t, log).map((n) => ({
+      id: n.id,
+      title: n.title,
+      body: n.body,
+      channelId: THERAPY_CHANNEL,
+      schedule: { at: n.at, allowWhileIdle: true },
+      extra: { tab: 'oggi' },
+    }));
+    // a blocchi per non superare i limiti del bridge
+    for (let i = 0; i < list.length; i += 60) await LocalNotifications.schedule({ notifications: list.slice(i, i + 60) });
+    return 'ok';
+  } catch {
+    return 'error';
+  }
+}
+
+/** Android 12+: gli orari esatti richiedono il permesso "Sveglie e promemoria". */
+export async function exactAlarmsAllowed(): Promise<boolean> {
+  if (!notificationsSupported()) return true;
+  try {
+    return (await LocalNotifications.checkExactNotificationSetting()).exact_alarm === 'granted';
+  } catch {
+    return true;
+  }
+}
+
+export async function openExactAlarmSettings(): Promise<void> {
+  try {
+    await LocalNotifications.changeExactNotificationSetting();
+  } catch {
+    /* non disponibile */
+  }
 }

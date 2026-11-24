@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { MacroSummary } from '../components/MacroSummary';
 import { RemindersFields } from '../components/RemindersFields';
 import { BackupFields } from '../components/BackupFields';
+import { TherapyFields } from '../components/Therapy';
 import { ActivityFields, BasicFields, FreeMealFields, GoalFields, PlanStyleFields, PreferenceFields, validateBasics } from '../components/ProfileFields';
 import { calcTargets } from '../lib/nutrition';
 import { useStore } from '../lib/store';
@@ -63,6 +64,9 @@ export function ProfileScreen() {
             </button>
           ))}
         </div>
+      </Section>
+      <Section title="💊 Terapia">
+        <TherapyFields />
       </Section>
       <Section title="Promemoria (si salvano subito)"><RemindersFields /></Section>
       <Section title="Backup ed export"><BackupFields /></Section>

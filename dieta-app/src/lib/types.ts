@@ -190,3 +190,25 @@ export interface Measurement {
   thigh?: number;
   photoId?: string; // foto in IndexedDB
 }
+
+// ---------- Terapia (promemoria farmaco a step) ----------
+export interface TherapyStep {
+  months: number; // durata in mesi di calendario
+  dose: string; // es. "1,5 mg"
+}
+
+export interface Therapy {
+  enabled: boolean;
+  name: string;
+  startDate: string; // YYYY-MM-DD
+  steps: TherapyStep[];
+  hour: number;
+  minute: number;
+  instructions: string;
+  /** controllo medico all'inizio del mese indicato (es. 5 = quinto mese) */
+  checkupMonth?: number;
+  checkupNote?: string;
+}
+
+/** data ISO → presa */
+export type TherapyLog = Record<string, boolean>;

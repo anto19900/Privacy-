@@ -46,7 +46,7 @@ export function exportBackup(): Record<string, unknown> {
   return out;
 }
 
-export const BACKUP_KEYS = ['profile', 'plan', 'weights', 'shopping', 'foodLog', 'reminders', 'measurements', 'pantry'];
+export const BACKUP_KEYS = ['profile', 'plan', 'weights', 'shopping', 'foodLog', 'reminders', 'measurements', 'pantry', 'therapy', 'therapyLog'];
 
 export function importBackup(data: Record<string, unknown>): void {
   clearAll();
