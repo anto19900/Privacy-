@@ -31,7 +31,13 @@ interface Row {
 
 const W = { p: 12, c: 8, f: 10, kcal: 10, meal: 0.35, reg: 0.02 };
 
-export function optimizeDay(day: DayPlan, target: MacroTarget): DayPlan {
+/**
+ * @param locked pasti già consumati: restano invariati e non partecipano all'ottimizzazione
+ *               (il target passato deve essere già al netto di quanto consumato).
+ * Le voci facoltative azzerate restano con grams = 0 (gli indici non cambiano);
+ * chi salva il piano le filtra con `dropEmpty`.
+ */
+export function optimizeDay(day: DayPlan, target: MacroTarget, locked: ReadonlySet<string> = new Set()): DayPlan {
   const meals = day.meals.map((m) => ({ ...m, items: m.items.map((i) => ({ ...i })) }));
   const vars: Var[] = [];
   const g0: number[] = [];
@@ -39,7 +45,7 @@ export function optimizeDay(day: DayPlan, target: MacroTarget): DayPlan {
   const fixedMeal = meals.map(() => 0);
 
   meals.forEach((meal, mi) => {
-    if (meal.free) return;
+    if (meal.free || locked.has(meal.key)) return;
     meal.items.forEach((it, ii) => {
       const food = getFood(it.foodId);
       const coef = { kcal: food.kcal / 100, p: food.p / 100, c: food.c / 100, f: food.f / 100 };
@@ -60,21 +66,23 @@ export function optimizeDay(day: DayPlan, target: MacroTarget): DayPlan {
   const n = vars.length;
   if (n === 0) return { meals };
 
+
   const rows: Row[] = [];
   const addRow = (fn: (v: Var, i: number) => number, b: number, scale: number, w: number) => {
     const a = new Float64Array(n);
     vars.forEach((v, i) => (a[i] = fn(v, i) / scale));
     rows.push({ a, b: b / scale, w });
   };
-  addRow((v) => v.coef.p, target.p - fixed.p, Math.max(target.p, 1), W.p);
-  addRow((v) => v.coef.c, target.c - fixed.c, Math.max(target.c, 1), W.c);
-  addRow((v) => v.coef.f, target.f - fixed.f, Math.max(target.f, 1), W.f);
-  addRow((v) => v.coef.kcal, target.kcal - fixed.kcal, Math.max(target.kcal, 1), W.kcal);
+  const t = { kcal: Math.max(0, target.kcal), p: Math.max(0, target.p), c: Math.max(0, target.c), f: Math.max(0, target.f) };
+  addRow((v) => v.coef.p, t.p - fixed.p, Math.max(t.p, 10), W.p);
+  addRow((v) => v.coef.c, t.c - fixed.c, Math.max(t.c, 10), W.c);
+  addRow((v) => v.coef.f, t.f - fixed.f, Math.max(t.f, 5), W.f);
+  addRow((v) => v.coef.kcal, t.kcal - fixed.kcal, Math.max(t.kcal, 100), W.kcal);
 
-  const active = meals.map((m, i) => ({ m, i })).filter(({ m }) => !m.free && m.items.length);
+  const active = meals.map((m, i) => ({ m, i })).filter(({ m }) => !m.free && !locked.has(m.key) && m.items.length);
   const shareSum = active.reduce((s, { m }) => s + MEAL_SHARES[m.key], 0);
   for (const { m, i: mi } of active) {
-    const mealKcal = (target.kcal * MEAL_SHARES[m.key]) / shareSum;
+    const mealKcal = (t.kcal * MEAL_SHARES[m.key]) / shareSum;
     addRow((v) => (v.meal === mi ? v.coef.kcal : 0), mealKcal - fixedMeal[mi], Math.max(mealKcal, 1), W.meal);
   }
   vars.forEach((_, k) => addRow((_v, i) => (i === k ? 1 : 0), g0[k], Math.max(g0[k], 1), W.reg));
@@ -134,5 +142,9 @@ export function optimizeDay(day: DayPlan, target: MacroTarget): DayPlan {
     // sotto il minimo "sensato" una voce facoltativa viene tolta
     meals[v.meal].items[v.item].grams = g[i] < food.min ? 0 : Math.round(g[i]);
   });
-  return { meals: meals.map((m) => ({ ...m, items: m.items.filter((i) => i.grams > 0) })) };
+  return { meals };
+}
+
+export function dropEmpty(day: DayPlan): DayPlan {
+  return { meals: day.meals.map((m) => ({ ...m, items: m.items.filter((i) => i.grams > 0) })) };
 }

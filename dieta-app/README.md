@@ -18,6 +18,12 @@ App Android (React + TypeScript + Tailwind CSS + Capacitor) per:
 - **Peso**: registrazione, grafico Recharts con linea obiettivo e **previsione** tratteggiata fino al peso obiettivo
   (data stimata di arrivo), variazione, BMI e distanza dall'obiettivo.
 
+- **Diario dei pasti**: ogni pasto si segna come Mangiato / Altro (kcal stimate) / Saltato; i pasti rimasti
+  del giorno vengono ri-ottimizzati sul target residuo. Riquadro aderenza degli ultimi 7 giorni.
+- **Metabolismo reale**: media mobile 7 giorni del peso e stima del TDEE reale (calorie medie − variazione
+  di peso × 7.700) con proposta di correzione delle calorie applicabile con un tocco (`src/lib/adaptive.ts`).
+- **Promemoria** (notifiche locali): pesata, menù a Mamma (apre già il messaggio del giorno dopo), spesa.
+
 Funziona 100% offline: i dati restano nel `localStorage` del telefono.
 
 ## Struttura

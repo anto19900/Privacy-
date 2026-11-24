@@ -16,6 +16,8 @@ export interface Profile {
   weeklyRateKg?: number;
   diet: DietType;
   freeMeal?: FreeMeal;
+  /** correzione kcal suggerita dalla stima del TDEE reale (applicata dall'utente) */
+  kcalAdjust?: number;
   lactoseFree: boolean;
   glutenFree: boolean;
   excludedFoods: string[]; // id alimenti esclusi
@@ -130,4 +132,36 @@ export interface ExtraItem {
 export interface ShoppingState {
   checked: Record<string, boolean>;
   extras: ExtraItem[];
+}
+
+// ---------- Diario dei pasti ----------
+export type MealStatus = 'done' | 'skipped' | 'other';
+
+export interface MealLog {
+  status: MealStatus;
+  kcal: number;
+  p: number;
+  c: number;
+  f: number;
+  /** alimenti effettivamente mangiati (per "done") */
+  items?: MealItem[];
+}
+
+export type DayLog = Partial<Record<MealKey, MealLog>>;
+/** chiave = data ISO (YYYY-MM-DD) */
+export type FoodLog = Record<string, DayLog>;
+
+// ---------- Promemoria ----------
+export interface Reminder {
+  enabled: boolean;
+  /** 0 = Lunedì … 6 = Domenica, -1 = ogni giorno */
+  weekday: number;
+  hour: number;
+  minute: number;
+}
+
+export interface Reminders {
+  weigh: Reminder;
+  mamma: Reminder;
+  shopping: Reminder;
 }

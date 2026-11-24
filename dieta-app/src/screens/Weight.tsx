@@ -1,16 +1,17 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { estimateAdaptive, MIN_DAYS, movingAverage } from '../lib/adaptive';
 import { buildForecast, toTime } from '../lib/forecast';
 import { fmt1, fmtDate, isoDate } from '../lib/format';
 import { bmiLabel, bmiTone, calcBmi } from '../lib/nutrition';
 import { useStore } from '../lib/store';
 
 export function Weight() {
-  const { weights, profile, targets, addWeight, removeWeight } = useStore();
+  const { weights, profile, targets, plan, foodLog, addWeight, removeWeight, applyKcalAdjust } = useStore();
   const [date, setDate] = useState(isoDate());
   const [kg, setKg] = useState('');
-  if (!profile || !targets) return null;
+  if (!profile || !targets || !plan) return null;
 
   const first = weights[0];
   const last = weights[weights.length - 1];
@@ -20,12 +21,17 @@ export function Weight() {
   const toGoal = current - profile.goalWeightKg;
   const bmi = calcBmi(current, profile.heightCm);
 
-  const forecast = buildForecast(weights, profile.weightKg, profile.goalWeightKg, targets.weeklyChangeKg);
+  const ma = movingAverage(weights);
+  const trend = ma[ma.length - 1];
+  // la previsione parte dalla media mobile: meno sensibile alle oscillazioni del singolo giorno
+  const forecast = buildForecast(trend ? [{ date: trend.date, kg: trend.avg }] : [], profile.weightKg, profile.goalWeightKg, targets.weeklyChangeKg);
+  const estimate = estimateAdaptive(weights, foodLog, plan, targets, profile);
 
-  // serie unica per Recharts: "kg" = pesate reali, "previsto" = proiezione teorica
-  type Row = { t: number; kg?: number; previsto?: number };
+  // serie unica per Recharts: "kg" = pesate, "media" = media 7 giorni, "previsto" = proiezione
+  type Row = { t: number; kg?: number; media?: number; previsto?: number };
   const rows = new Map<number, Row>();
   weights.forEach((w) => rows.set(toTime(w.date), { t: toTime(w.date), kg: w.kg }));
+  ma.forEach((m) => rows.set(m.t, { ...(rows.get(m.t) ?? { t: m.t }), media: m.avg }));
   forecast.points.forEach((f) => rows.set(f.t, { ...(rows.get(f.t) ?? { t: f.t }), previsto: f.kg }));
   const data = [...rows.values()].sort((a, b) => a.t - b.t);
 
@@ -70,7 +76,7 @@ export function Weight() {
 
       <div className="grid grid-cols-2 gap-3">
         <Stat label="Peso iniziale" value={`${fmt1(start)} kg`} />
-        <Stat label="Peso attuale" value={`${fmt1(current)} kg`} accent />
+        <Stat label="Peso attuale" value={`${fmt1(current)} kg`} sub={trend ? `media 7 gg: ${fmt1(trend.avg)} kg` : undefined} accent />
         <Stat label="Variazione totale" value={signed(delta)} tone={delta < 0 ? 'good' : delta > 0 ? 'warn' : undefined} />
         <Stat label="All'obiettivo" value={Math.abs(toGoal) < 0.05 ? 'Raggiunto! 🎉' : `${fmt1(Math.abs(toGoal))} kg`} sub={`obiettivo ${fmt1(profile.goalWeightKg)} kg`} />
         <div className="card col-span-2 flex items-center justify-between">
@@ -95,12 +101,13 @@ export function Weight() {
                 <YAxis domain={[yMin, yMax]} tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
                 <Tooltip
                   labelFormatter={(t: number) => new Date(t).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
-                  formatter={(v: number, name: string) => [`${fmt1(v)} kg`, name === 'kg' ? 'Peso' : 'Previsto']}
+                  formatter={(v: number, name: string) => [`${fmt1(v)} kg`, name === 'kg' ? 'Pesata' : name === 'media' ? 'Media 7 gg' : 'Previsto']}
                   contentStyle={{ borderRadius: 12 }}
                 />
-                <Legend formatter={(v: string) => (v === 'kg' ? 'Peso reale' : 'Previsione')} wrapperStyle={{ fontSize: 12 }} />
+                <Legend formatter={(v: string) => (v === 'kg' ? 'Pesate' : v === 'media' ? 'Media 7 giorni' : 'Previsione')} wrapperStyle={{ fontSize: 12 }} />
                 <ReferenceLine y={profile.goalWeightKg} stroke="#f43f5e" strokeDasharray="6 4" label={{ value: 'Obiettivo', position: 'insideTopRight', fill: '#f43f5e', fontSize: 11 }} />
-                <Line type="monotone" dataKey="kg" stroke="#059669" strokeWidth={3} dot={{ r: 4, fill: '#059669' }} activeDot={{ r: 6 }} connectNulls />
+                <Line type="linear" dataKey="kg" stroke="#6ee7b7" strokeWidth={1.5} dot={{ r: 3, fill: '#6ee7b7' }} activeDot={{ r: 5 }} connectNulls />
+                <Line type="monotone" dataKey="media" stroke="#047857" strokeWidth={3} dot={false} connectNulls />
                 {forecast.points.length > 0 && (
                   <Line type="linear" dataKey="previsto" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />
                 )}
@@ -119,9 +126,24 @@ export function Weight() {
           ) : Math.abs(toGoal) >= 0.05 ? (
             <p className="rounded-xl bg-slate-50 p-3">Con l'obiettivo attuale ({profile.goal}) non è prevista una variazione verso il peso obiettivo: modifica obiettivo o ritmo nel Profilo.</p>
           ) : null}
-          <p className="mt-2 text-xs text-slate-400">Previsione teorica lineare (1 kg ≈ 7.700 kcal), parte dall'ultima pesata. Il calo reale di solito rallenta nel tempo.</p>
+          <p className="mt-2 text-xs text-slate-400">
+            La media 7 giorni smussa le oscillazioni dovute ad acqua e sale. Previsione teorica lineare (1 kg ≈ 7.700 kcal) a partire dalla media.
+          </p>
         </div>
       </div>
+
+      <AdaptiveCard
+        estimate={estimate}
+        weighIns={weights.length}
+        kcal={targets.kcal}
+        adjust={profile.kcalAdjust ?? 0}
+        onApply={(delta) => {
+          if (confirm(`Portare le calorie a ${targets.kcal + delta} kcal/giorno e rigenerare il piano della settimana?`)) applyKcalAdjust(delta);
+        }}
+        onReset={() => {
+          if (confirm('Tornare alle calorie calcolate con la formula e rigenerare il piano?')) applyKcalAdjust(-(profile.kcalAdjust ?? 0));
+        }}
+      />
 
       <div className="card">
         <h2 className="mb-2 font-bold text-slate-800">Storico</h2>
@@ -151,6 +173,80 @@ function Stat({ label, value, sub, accent, tone }: { label: string; value: strin
       <p className="text-xs text-slate-500">{label}</p>
       <p className={`text-xl font-bold ${color}`}>{value}</p>
       {sub && <p className="text-xs text-slate-400">{sub}</p>}
+    </div>
+  );
+}
+
+function AdaptiveCard({ estimate: e, weighIns, kcal, adjust, onApply, onReset }: {
+  estimate: ReturnType<typeof estimateAdaptive>;
+  weighIns: number;
+  kcal: number;
+  adjust: number;
+  onApply: (delta: number) => void;
+  onReset: () => void;
+}) {
+  const rate = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmt1(Math.abs(n))} kg/sett.`;
+  return (
+    <div className="card space-y-3">
+      <div>
+        <h2 className="font-bold text-slate-800">🧠 Il tuo metabolismo reale</h2>
+        <p className="text-xs text-slate-500">Confronta quanto mangi con come cambia davvero il peso.</p>
+      </div>
+      {!e ? (
+        <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+          Servono almeno <b>4 pesate</b> distribuite su <b>{MIN_DAYS} giorni</b> (ultime 4 settimane). Pesate registrate: {weighIns}. Più pasti
+          segni nel diario, più la stima sarà precisa.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2 text-center">
+            <div className="rounded-xl bg-slate-50 p-2.5">
+              <p className="text-xs text-slate-500">TDEE da formula</p>
+              <p className="text-lg font-bold text-slate-700">{e.formulaTdee}</p>
+            </div>
+            <div className="rounded-xl bg-emerald-50 p-2.5">
+              <p className="text-xs text-slate-500">TDEE reale stimato</p>
+              <p className="text-lg font-extrabold text-emerald-700">{e.realTdee}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-2.5">
+              <p className="text-xs text-slate-500">Ritmo reale</p>
+              <p className="text-lg font-bold text-slate-700">{rate(e.observedWeeklyKg)}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-2.5">
+              <p className="text-xs text-slate-500">Ritmo voluto</p>
+              <p className="text-lg font-bold text-slate-700">{rate(e.expectedWeeklyKg)}</p>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500">
+            Basato su {e.weighIns} pesate in {e.days} giorni · calorie medie {e.avgIntake} kcal ({e.loggedDays} giorni con diario completo, gli altri
+            stimati dal piano).
+          </p>
+          {Math.abs(e.delta) < 50 ? (
+            <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">✅ Sei in linea: le calorie attuali ({kcal} kcal) vanno bene così.</p>
+          ) : (
+            <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+              <p>
+                {e.delta < 0 ? '📉' : '📈'} Per tenere il ritmo voluto ti suggeriamo <b>{e.suggestedKcal} kcal/giorno</b> ({e.delta > 0 ? '+' : '−'}
+                {Math.abs(e.delta)} kcal).
+              </p>
+              <button className="btn-primary mt-2 w-full" onClick={() => onApply(e.delta)}>
+                Applica {e.suggestedKcal} kcal e rigenera il piano
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      {adjust !== 0 && (
+        <div className="flex items-center justify-between rounded-xl bg-sky-50 p-3 text-sm text-sky-800">
+          <span>
+            Correzione attiva: {adjust > 0 ? '+' : '−'}
+            {Math.abs(adjust)} kcal
+          </span>
+          <button className="font-semibold underline" onClick={onReset}>
+            Ripristina
+          </button>
+        </div>
+      )}
     </div>
   );
 }

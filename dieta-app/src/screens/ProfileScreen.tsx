@@ -1,6 +1,7 @@
 import { Save } from 'lucide-react';
 import { useState } from 'react';
 import { MacroSummary } from '../components/MacroSummary';
+import { RemindersFields } from '../components/RemindersFields';
 import { ActivityFields, BasicFields, FreeMealFields, GoalFields, PreferenceFields, validateBasics } from '../components/ProfileFields';
 import { calcTargets } from '../lib/nutrition';
 import { useStore } from '../lib/store';
@@ -43,6 +44,8 @@ export function ProfileScreen() {
       <Section title="Obiettivo"><GoalFields value={draft} onChange={setDraft} /></Section>
       <Section title="Pasto libero"><FreeMealFields value={draft} onChange={setDraft} /></Section>
       <Section title="Preferenze alimentari"><PreferenceFields value={draft} onChange={setDraft} /></Section>
+
+      <Section title="Promemoria (si salvano subito)"><RemindersFields /></Section>
 
       {msg && <p className={`rounded-xl p-3 text-sm font-medium ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-700'}`}>{msg.text}</p>}
       <button className="btn-primary w-full text-base" onClick={save}>

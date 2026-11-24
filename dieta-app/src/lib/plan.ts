@@ -1,6 +1,6 @@
 import { FOODS, getFood } from './foods';
 import { calcTargets, MEAL_SHARES } from './nutrition';
-import { optimizeDay } from './solver';
+import { dropEmpty, optimizeDay } from './solver';
 import type { Cluster, DayPlan, Food, MacroTarget, Meal, MealItem, MealKey, Profile, Targets, WeekPlan } from './types';
 
 export const PLAN_VERSION = 2;
@@ -181,7 +181,7 @@ function buildDay(p: Profile, target: MacroTarget, d: number, freeMeal: Targets[
     }
     return { key, items };
   });
-  return optimizeDay({ meals }, target);
+  return dropEmpty(optimizeDay({ meals }, target));
 }
 
 export function generateWeek(p: Profile): WeekPlan {
@@ -192,6 +192,11 @@ export function generateWeek(p: Profile): WeekPlan {
 
 /** Sostituisce un alimento e ri-ottimizza il giorno per restare nei macro. */
 export function swapInDay(day: DayPlan, mealKey: MealKey, itemIndex: number, foodId: string, target: MacroTarget): DayPlan {
+  return dropEmpty(swapRaw(day, mealKey, itemIndex, foodId, target));
+}
+
+/** Come swapInDay ma mantiene le voci a 0 g, così gli indici restano stabili. */
+function swapRaw(day: DayPlan, mealKey: MealKey, itemIndex: number, foodId: string, target: MacroTarget): DayPlan {
   const meals = day.meals.map((m) =>
     m.key !== mealKey
       ? m
@@ -218,9 +223,10 @@ export function alternativesFor(day: DayPlan, mealKey: MealKey, itemIndex: numbe
   return allowedInCluster(item.cluster, p)
     .filter((f) => f.id !== item.foodId)
     .map((f) => {
-      const nd = swapInDay(day, mealKey, itemIndex, f.id, target);
+      const nd = swapRaw(day, mealKey, itemIndex, f.id, target);
       return nd.meals.find((m) => m.key === mealKey)!.items[itemIndex];
-    });
+    })
+    .filter((it) => it.grams > 0);
 }
 
 /** Indice del giorno corrente con Lunedì = 0. */

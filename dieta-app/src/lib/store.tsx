@@ -3,7 +3,8 @@ import { calcTargets } from './nutrition';
 import { generateWeek, PLAN_VERSION, swapInDay } from './plan';
 import { clearAll, load, save } from './storage';
 import { isoDate } from './format';
-import type { ExtraItem, MealKey, Profile, ShoppingState, Targets, WeekPlan, WeightEntry } from './types';
+import { applyReminders, DEFAULT_REMINDERS, type ApplyResult } from './notifications';
+import type { ExtraItem, FoodLog, MealKey, MealLog, Profile, Reminders, ShoppingState, Targets, WeekPlan, WeightEntry } from './types';
 
 interface Store {
   profile: Profile | null;
@@ -22,6 +23,11 @@ interface Store {
   removeExtra: (id: string) => void;
   resetChecks: () => void;
   resetAll: () => void;
+  foodLog: FoodLog;
+  logMeal: (date: string, meal: MealKey, log: MealLog | null) => void;
+  reminders: Reminders;
+  setReminders: (r: Reminders) => Promise<ApplyResult>;
+  applyKcalAdjust: (delta: number) => void;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -38,7 +44,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [weights, setWeights] = useState<WeightEntry[]>(() => load<WeightEntry[]>('weights', []));
   const [shopping, setShopping] = useState<ShoppingState>(() => load<ShoppingState>('shopping', { checked: {}, extras: [] }));
 
+  const [foodLog, setFoodLog] = useState<FoodLog>(() => load<FoodLog>('foodLog', {}));
+  const [reminders, setRemindersState] = useState<Reminders>(() => ({ ...DEFAULT_REMINDERS, ...load<Partial<Reminders>>('reminders', {}) }));
+
   useEffect(() => save('profile', profile), [profile]);
+  useEffect(() => save('foodLog', foodLog), [foodLog]);
+  useEffect(() => save('reminders', reminders), [reminders]);
   useEffect(() => save('plan', plan), [plan]);
   useEffect(() => save('weights', weights), [weights]);
   useEffect(() => save('shopping', shopping), [shopping]);
@@ -80,7 +91,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [targets],
   );
 
+  const logMeal = useCallback((date: string, meal: MealKey, log: MealLog | null) => {
+    setFoodLog((fl) => {
+      const day = { ...(fl[date] ?? {}) };
+      if (log) day[meal] = log;
+      else delete day[meal];
+      const next = { ...fl, [date]: day };
+      if (Object.keys(day).length === 0) delete next[date];
+      return next;
+    });
+  }, []);
+
+  const setReminders = useCallback(async (r: Reminders) => {
+    setRemindersState(r);
+    return applyReminders(r);
+  }, []);
+
+  const applyKcalAdjust = useCallback(
+    (delta: number) => {
+      if (!profile) return;
+      const p = { ...profile, kcalAdjust: Math.round((profile.kcalAdjust ?? 0) + delta) };
+      setProfile(p);
+      setPlan(generateWeek(p));
+    },
+    [profile],
+  );
+
   const value: Store = {
+    foodLog,
+    logMeal,
+    reminders,
+    setReminders,
+    applyKcalAdjust,
     profile,
     targets,
     plan,
@@ -108,6 +150,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setPlan(null);
       setWeights([]);
       setShopping({ checked: {}, extras: [] });
+      setFoodLog({});
+      void setReminders(DEFAULT_REMINDERS);
     },
   };
 

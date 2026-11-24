@@ -8,10 +8,10 @@ import { dayMessage, weekMessage } from '../lib/messages';
 import { dayItems, DAYS, sumMacros, todayIndex } from '../lib/plan';
 import { useStore } from '../lib/store';
 
-export function Week() {
+export function Week({ initialDay, openMamma }: { initialDay?: number; openMamma?: boolean }) {
   const { plan, profile, targets, regenerate } = useStore();
-  const [sel, setSel] = useState(todayIndex());
-  const [share, setShare] = useState<'day' | 'week' | null>(null);
+  const [sel, setSel] = useState(initialDay ?? todayIndex());
+  const [share, setShare] = useState<'day' | 'week' | null>(openMamma ? 'day' : null);
   const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

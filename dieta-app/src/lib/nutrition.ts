@@ -58,7 +58,7 @@ export function calcTargets(p: Profile): Targets {
       ? tdee - ((p.weeklyRateKg ?? DEFAULT_RATE) * KCAL_PER_KG) / 7
       : tdee * (1 + goal.kcalDelta);
   const rounded = Math.round(wanted / 10) * 10;
-  const kcal = Math.max(floor, rounded);
+  const kcal = Math.max(floor, rounded + Math.round(p.kcalAdjust ?? 0));
   const dailyDelta = Math.round(kcal - tdee);
   const weeklyChangeKg = (dailyDelta * 7) / KCAL_PER_KG;
 
@@ -101,7 +101,7 @@ export function calcTargets(p: Profile): Targets {
     kcal,
     dailyDelta,
     weeklyChangeKg,
-    floorApplied: rounded < floor,
+    floorApplied: rounded + (p.kcalAdjust ?? 0) < floor,
     proteinG: avg.p,
     carbsG: avg.c,
     fatG: avg.f,

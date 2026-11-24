@@ -1,28 +1,89 @@
-import { ArrowLeftRight, Check } from 'lucide-react';
+import { ArrowLeftRight, Check, CircleSlash, PencilLine, Undo2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { logDone, logOther, logSkipped, mealMacros } from '../lib/diary';
 import { getFood } from '../lib/foods';
 import { fmtQty } from '../lib/format';
 import { alternativesFor, CLUSTER_LABEL, MEALS, sumMacros } from '../lib/plan';
 import { useStore } from '../lib/store';
-import type { Meal, MealItem } from '../lib/types';
+import type { Meal, MealItem, MealLog } from '../lib/types';
 import { Sheet } from './Sheet';
 
 interface Props {
   meal: Meal;
   dayIndex: number;
   compact?: boolean;
+  /** se presente, mostra i pulsanti del diario (solo per oggi) */
+  log?: MealLog;
+  onLog?: (log: MealLog | null) => void;
+  /** il giorno è stato ribilanciato rispetto al piano */
+  rebalanced?: boolean;
 }
 
-export function MealCard({ meal, dayIndex, compact }: Props) {
+const STATUS = {
+  done: { label: 'Mangiato', cls: 'bg-emerald-100 text-emerald-800', Icon: Check },
+  other: { label: 'Mangiato altro', cls: 'bg-amber-100 text-amber-800', Icon: PencilLine },
+  skipped: { label: 'Saltato', cls: 'bg-slate-200 text-slate-700', Icon: CircleSlash },
+} as const;
+
+export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced }: Props) {
   const { profile, plan, targets, swap } = useStore();
   const [editing, setEditing] = useState<number | null>(null);
+  const [otherOpen, setOtherOpen] = useState(false);
   const info = MEALS[meal.key];
+  const visible = meal.items.map((it, i) => ({ it, i })).filter(({ it }) => it.grams > 0);
   const tot = sumMacros(meal.items);
+  const freeKcal = targets?.freeMeal?.kcal ?? 900;
   const current: MealItem | null = editing !== null ? meal.items[editing] ?? null : null;
   const day = plan?.days[dayIndex];
+  const planIndex = current && day ? day.meals.find((m) => m.key === meal.key)?.items.findIndex((x) => x.foodId === current.foodId) ?? -1 : -1;
   const alts = useMemo(
-    () => (editing !== null && day && profile && targets ? alternativesFor(day, meal.key, editing, profile, targets.perDay[dayIndex]) : []),
-    [editing, day, profile, targets, meal.key, dayIndex],
+    () =>
+      planIndex >= 0 && day && profile && targets ? alternativesFor(day, meal.key, planIndex, profile, targets.perDay[dayIndex]) : [],
+    [planIndex, day, profile, targets, meal.key, dayIndex],
+  );
+  const locked = !!log;
+  const plannedKcal = meal.free ? freeKcal : Math.round(mealMacros(meal).kcal);
+  const st = log ? STATUS[log.status] : null;
+
+  const diaryBar = onLog && (
+    <div className="mt-3 border-t border-slate-100 pt-3">
+      {log && st ? (
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${st.cls}`}>
+            <st.Icon size={16} /> {st.label}
+            {log.status !== 'skipped' && ` · ${Math.round(log.kcal)} kcal`}
+          </span>
+          <button className="ml-auto flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-slate-500 active:bg-slate-100" onClick={() => onLog(null)}>
+            <Undo2 size={16} /> Annulla
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          <button className="btn bg-emerald-600 px-2 text-sm text-white active:bg-emerald-700" onClick={() => onLog(logDone(meal, freeKcal))}>
+            <Check size={18} /> Mangiato
+          </button>
+          <button className="btn border border-amber-200 bg-amber-50 px-2 text-sm text-amber-800" onClick={() => setOtherOpen(true)}>
+            <PencilLine size={18} /> Altro
+          </button>
+          <button className="btn border border-slate-200 bg-white px-2 text-sm text-slate-600" onClick={() => onLog(logSkipped())}>
+            <CircleSlash size={18} /> Saltato
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const otherSheet = onLog && (
+    <OtherSheet
+      open={otherOpen}
+      plannedKcal={plannedKcal}
+      title={info.label}
+      onClose={() => setOtherOpen(false)}
+      onSave={(kcal) => {
+        onLog(logOther(meal, kcal, freeKcal));
+        setOtherOpen(false);
+      }}
+    />
   );
 
   if (meal.free) {
@@ -32,42 +93,47 @@ export function MealCard({ meal, dayIndex, compact }: Props) {
           <span className="text-xl">🍕</span> {info.label}: pasto libero
         </h3>
         <p className="mt-1 text-sm text-slate-600">
-          Goditelo senza pesare nulla! Circa <b>{targets?.freeMeal?.kcal ?? 900} kcal</b>, già conteggiate nel bilancio
-          settimanale: gli altri giorni sono leggermente ridotti per compensare.
+          Goditelo senza pesare nulla! Circa <b>{freeKcal} kcal</b>, già conteggiate nel bilancio settimanale: gli altri giorni
+          sono leggermente ridotti per compensare.
         </p>
+        {diaryBar}
+        {otherSheet}
       </div>
     );
   }
 
   return (
-    <div className="card">
+    <div className={`card ${log?.status === 'skipped' ? 'opacity-60' : ''}`}>
       <div className="mb-2 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-base font-bold text-slate-800">
           <span className="text-xl">{info.emoji}</span> {info.label}
         </h3>
-        <span className="rounded-full bg-sage-100 px-2.5 py-1 text-xs font-semibold text-sage-700">
-          {Math.round(tot.kcal)} kcal
-        </span>
+        <span className="rounded-full bg-sage-100 px-2.5 py-1 text-xs font-semibold text-sage-700">{Math.round(tot.kcal)} kcal</span>
       </div>
+      {rebalanced && !locked && (
+        <p className="mb-1 rounded-lg bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700">↻ Grammature ribilanciate in base a quanto hai già mangiato oggi</p>
+      )}
       <ul className="divide-y divide-slate-100">
-        {meal.items.map((it, i) => {
+        {visible.map(({ it, i }) => {
           const f = getFood(it.foodId);
           return (
             <li key={i} className="flex items-center gap-3 py-2">
               <span className="text-2xl leading-none">{f.emoji}</span>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-slate-800">{f.name}</p>
-                <p className="text-sm text-emerald-700 font-semibold">{fmtQty(it.foodId, it.grams)}</p>
+                <p className="text-sm font-semibold text-emerald-700">{fmtQty(it.foodId, it.grams)}</p>
               </div>
-              <button
-                onClick={() => setEditing(i)}
-                className={`flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 font-semibold text-emerald-800 active:bg-emerald-100 ${
-                  compact ? 'px-2.5 py-2 text-xs' : 'px-3 py-2.5 text-sm'
-                }`}
-                aria-label={`Cambia ${f.name}`}
-              >
-                <ArrowLeftRight size={16} /> Cambia
-              </button>
+              {!locked && (
+                <button
+                  onClick={() => setEditing(i)}
+                  className={`flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 font-semibold text-emerald-800 active:bg-emerald-100 ${
+                    compact ? 'px-2.5 py-2 text-xs' : 'px-3 py-2.5 text-sm'
+                  }`}
+                  aria-label={`Cambia ${f.name}`}
+                >
+                  <ArrowLeftRight size={16} /> Cambia
+                </button>
+              )}
             </li>
           );
         })}
@@ -77,6 +143,8 @@ export function MealCard({ meal, dayIndex, compact }: Props) {
           P {Math.round(tot.p)}g · C {Math.round(tot.c)}g · G {Math.round(tot.f)}g
         </p>
       )}
+      {diaryBar}
+      {otherSheet}
 
       <Sheet
         open={current !== null}
@@ -97,7 +165,9 @@ export function MealCard({ meal, dayIndex, compact }: Props) {
             <p className="pt-1 text-center text-sm font-semibold uppercase tracking-wide text-slate-400">oppure</p>
             {alts.length === 0 && <p className="text-center text-slate-500">Nessuna alternativa compatibile con le tue preferenze.</p>}
             {alts.length > 0 && (
-              <p className="text-center text-xs text-slate-400">Scegliendo un'alternativa, le altre grammature del giorno si adattano leggermente per mantenere proteine, carboidrati e grassi.</p>
+              <p className="text-center text-xs text-slate-400">
+                Scegliendo un'alternativa, le altre grammature del giorno si adattano leggermente per mantenere proteine, carboidrati e grassi.
+              </p>
             )}
             {alts.map((a) => {
               const f = getFood(a.foodId);
@@ -105,7 +175,7 @@ export function MealCard({ meal, dayIndex, compact }: Props) {
                 <button
                   key={a.foodId}
                   onClick={() => {
-                    if (editing !== null) swap(dayIndex, meal.key, editing, a.foodId);
+                    if (planIndex >= 0) swap(dayIndex, meal.key, planIndex, a.foodId);
                     setEditing(null);
                   }}
                   className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left active:bg-emerald-50"
@@ -126,5 +196,40 @@ export function MealCard({ meal, dayIndex, compact }: Props) {
         )}
       </Sheet>
     </div>
+  );
+}
+
+/** "Ho mangiato altro": scelta rapida o calorie stimate a mano. */
+function OtherSheet({ open, plannedKcal, title, onClose, onSave }: {
+  open: boolean; plannedKcal: number; title: string; onClose: () => void; onSave: (kcal: number) => void;
+}) {
+  const [custom, setCustom] = useState('');
+  const quick = [
+    { label: 'Meno del previsto', sub: '~ metà', k: 0.5 },
+    { label: 'Più o meno uguale', sub: 'stesse calorie', k: 1 },
+    { label: 'Di più', sub: '~ +50%', k: 1.5 },
+    { label: 'Molto di più', sub: '~ il doppio', k: 2 },
+  ];
+  const n = parseInt(custom, 10);
+  return (
+    <Sheet open={open} onClose={onClose} title={`${title}: mangiato altro`} subtitle={`Previsto: circa ${plannedKcal} kcal. I pasti rimasti di oggi si ribilanciano.`}>
+      <div className="grid grid-cols-2 gap-2">
+        {quick.map((q) => (
+          <button key={q.k} className="rounded-2xl border border-slate-200 bg-white p-3 text-left active:bg-amber-50" onClick={() => onSave(Math.round(plannedKcal * q.k))}>
+            <p className="font-semibold text-slate-800">{q.label}</p>
+            <p className="text-xs text-slate-500">
+              {q.sub} · {Math.round(plannedKcal * q.k)} kcal
+            </p>
+          </button>
+        ))}
+      </div>
+      <p className="mb-1 mt-4 text-sm font-medium text-slate-600">Oppure inserisci le calorie stimate</p>
+      <div className="flex gap-2">
+        <input className="input" inputMode="numeric" placeholder="es. 650" value={custom} onChange={(e) => setCustom(e.target.value.replace(/\D/g, ''))} />
+        <button className="btn-primary px-5" disabled={!(n > 0)} onClick={() => n > 0 && onSave(n)}>
+          Salva
+        </button>
+      </div>
+    </Sheet>
   );
 }
