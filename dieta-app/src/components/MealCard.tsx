@@ -1,11 +1,11 @@
-import { ArrowLeftRight, Ban, Check, CircleSlash, PencilLine, Repeat, Star, Undo2 } from 'lucide-react';
+import { ArrowLeftRight, Ban, Check, CircleSlash, Lock, Minus, PencilLine, Plus, Repeat, Star, Undo2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { logDone, logOther, logSkipped, mealMacros } from '../lib/diary';
 import { getFood } from '../lib/foods';
 import { fmtQty } from '../lib/format';
-import { alternativesFor, CLUSTER_LABEL, MEALS, sumMacros } from '../lib/plan';
+import { alternativesFor, CLUSTER_LABEL, dayItems, MEALS, setQuantity as previewQuantity, sumMacros } from '../lib/plan';
 import { useStore } from '../lib/store';
-import type { Meal, MealItem, MealLog } from '../lib/types';
+import type { DayPlan, MacroTarget, Meal, MealItem, MealKey, MealLog } from '../lib/types';
 import { Sheet } from './Sheet';
 
 interface Props {
@@ -28,7 +28,8 @@ const STATUS = {
 } as const;
 
 export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced, onRepeat }: Props) {
-  const { profile, plan, targets, swap, toggleFavorite, banFood } = useStore();
+  const { profile, plan, targets, swap, toggleFavorite, banFood, setQuantity } = useStore();
+  const [qtyEdit, setQtyEdit] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [otherOpen, setOtherOpen] = useState(false);
   const info = MEALS[meal.key];
@@ -137,7 +138,18 @@ export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced, onRe
               <span className="text-2xl leading-none">{f.emoji}</span>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-slate-800">{f.name}</p>
-                <p className="text-sm font-semibold text-emerald-700">{fmtQty(it.foodId, it.grams)}</p>
+                {locked ? (
+                  <p className="text-sm font-semibold text-emerald-700">{fmtQty(it.foodId, it.grams)}</p>
+                ) : (
+                  <button
+                    className="-mx-1 flex items-center gap-1 rounded-lg px-1 text-left text-sm font-semibold text-emerald-700 underline decoration-dotted underline-offset-4 active:bg-emerald-50"
+                    onClick={() => setQtyEdit(i)}
+                    aria-label={`Modifica quantità di ${f.name}`}
+                  >
+                    {it.locked && <Lock size={12} className="shrink-0" />}
+                    {fmtQty(it.foodId, it.grams)}
+                  </button>
+                )}
               </div>
               {!locked && (
                 <button
@@ -232,7 +244,102 @@ export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced, onRe
           </div>
         )}
       </Sheet>
+
+      {qtyEdit !== null && day && targets && meal.items[qtyEdit] && (
+        <QuantitySheet
+          item={meal.items[qtyEdit]}
+          day={day}
+          mealKey={meal.key}
+          planIndex={day.meals.find((m) => m.key === meal.key)?.items.findIndex((x) => x.foodId === meal.items[qtyEdit].foodId) ?? -1}
+          target={targets.perDay[dayIndex]}
+          onClose={() => setQtyEdit(null)}
+          onSave={(pi, grams) => {
+            if (pi >= 0) setQuantity(dayIndex, meal.key, pi, grams);
+            setQtyEdit(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/** Modifica manuale della quantità con anteprima dei macro del giorno. */
+function QuantitySheet({ item, day, mealKey, planIndex, target, onClose, onSave }: {
+  item: MealItem; day: DayPlan; mealKey: MealKey; planIndex: number; target: MacroTarget;
+  onClose: () => void; onSave: (planIndex: number, grams: number | null) => void;
+}) {
+  const f = getFood(item.foodId);
+  const step = f.step;
+  const [g, setG] = useState(item.grams);
+  const [text, setText] = useState(String(Math.round(item.grams)));
+  const setBoth = (n: number) => {
+    const v = Math.max(step, Math.round(n * 10) / 10);
+    setG(v);
+    setText(String(Math.round(v)));
+  };
+  const preview = useMemo(() => {
+    if (planIndex < 0) return null;
+    return sumMacros(dayItems(previewQuantity(day, mealKey, planIndex, g, target)));
+  }, [day, mealKey, planIndex, g, target]);
+  const k = g / 100;
+  const ok = (v: number, t: number) => Math.abs(v - t) <= Math.max(5, t * 0.08);
+  const unitLabel = f.piece ? (f.piece.half ? `½ ${f.piece.singular}` : `1 ${f.piece.singular}`) : `${step} ${f.unit}`;
+
+  return (
+    <Sheet open onClose={onClose} title={f.name} subtitle="Scegli tu la quantità: gli altri alimenti del giorno si adattano per restare nei macro.">
+      <div className="flex items-center justify-between gap-3">
+        <button className="btn-ghost h-14 w-14 p-0" aria-label="Meno" onClick={() => setBoth(g - step)}>
+          <Minus />
+        </button>
+        <div className="flex-1 text-center">
+          <p className="text-xl font-extrabold text-slate-900">{fmtQty(item.foodId, g)}</p>
+          <p className="text-xs text-slate-500">± {unitLabel} per tocco</p>
+        </div>
+        <button className="btn-ghost h-14 w-14 p-0" aria-label="Più" onClick={() => setBoth(g + step)}>
+          <Plus />
+        </button>
+      </div>
+      <label className="mt-3 flex items-center gap-2">
+        <span className="text-sm text-slate-600">oppure</span>
+        <input
+          className="input w-28 py-2 text-center"
+          inputMode="numeric"
+          value={text}
+          onChange={(e) => {
+            const t = e.target.value.replace(/\D/g, '');
+            setText(t);
+            const n = parseInt(t, 10);
+            if (n > 0) setG(n);
+          }}
+        />
+        <span className="text-sm text-slate-600">{f.unit}</span>
+      </label>
+      <p className="mt-3 text-sm text-slate-600">
+        Questo alimento: <b>{Math.round(f.kcal * k)} kcal</b> · P {Math.round(f.p * k)} · C {Math.round(f.c * k)} · G {Math.round(f.f * k)}
+      </p>
+      {preview && (
+        <div className="mt-2 rounded-xl bg-slate-50 p-3 text-sm">
+          <p className="font-semibold text-slate-700">Giorno dopo il ribilanciamento</p>
+          <p className="text-slate-600">
+            <span className={ok(preview.kcal, target.kcal) ? '' : 'font-bold text-amber-600'}>{Math.round(preview.kcal)}/{target.kcal} kcal</span> ·{' '}
+            <span className={ok(preview.p, target.p) ? '' : 'font-bold text-amber-600'}>P {Math.round(preview.p)}/{target.p}</span> ·{' '}
+            <span className={ok(preview.c, target.c) ? '' : 'font-bold text-amber-600'}>C {Math.round(preview.c)}/{target.c}</span> ·{' '}
+            <span className={ok(preview.f, target.f) ? '' : 'font-bold text-amber-600'}>G {Math.round(preview.f)}/{target.f}</span>
+          </p>
+          {!(ok(preview.kcal, target.kcal) && ok(preview.p, target.p) && ok(preview.c, target.c) && ok(preview.f, target.f)) && (
+            <p className="mt-1 text-xs text-amber-700">Con questa quantità il giorno non riesce a restare del tutto nei macro (in arancione).</p>
+          )}
+        </div>
+      )}
+      <button className="btn-primary mt-4 w-full" onClick={() => onSave(planIndex, g)}>
+        <Lock size={18} /> Fissa questa quantità
+      </button>
+      {item.locked && (
+        <button className="btn-ghost mt-2 w-full" onClick={() => onSave(planIndex, null)}>
+          Torna automatica
+        </button>
+      )}
+    </Sheet>
   );
 }
 

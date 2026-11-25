@@ -3,7 +3,7 @@ import { calcTargets, MEAL_SHARES } from './nutrition';
 import { dropEmpty, optimizeDay } from './solver';
 import type { Cluster, DayPlan, Food, MacroTarget, Meal, MealItem, MealKey, Profile, Targets, WeekPlan } from './types';
 
-export const PLAN_VERSION = 2;
+export const PLAN_VERSION = 3;
 
 export const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -218,7 +218,7 @@ function swapRaw(day: DayPlan, mealKey: MealKey, itemIndex: number, foodId: stri
             // punto di partenza isocalorico, poi l'ottimizzatore sistema i macro
             const kcal = itemMacros(it).kcal;
             const grams = it.cluster === 'veg' ? it.grams : roundGrams(nf, (kcal / nf.kcal) * 100);
-            return { foodId, grams, cluster: it.cluster };
+            return { foodId, grams, cluster: it.cluster }; // alimento nuovo: quantità di nuovo automatica
           }),
         },
   );
@@ -282,4 +282,31 @@ export function replaceFoodEverywhere(plan: WeekPlan, foodId: string, p: Profile
     return day;
   });
   return { ...plan, days };
+}
+
+/**
+ * Imposta a mano la quantità di un alimento: resta fissata e gli altri
+ * alimenti del giorno vengono ri-ottimizzati per restare nei macro.
+ * Con `grams = null` torna automatica.
+ */
+export function setQuantity(day: DayPlan, mealKey: MealKey, itemIndex: number, grams: number | null, target: MacroTarget): DayPlan {
+  const meals = day.meals.map((m) =>
+    m.key !== mealKey
+      ? m
+      : {
+          ...m,
+          items: m.items.map((it, i) => {
+            if (i !== itemIndex) return it;
+            if (grams === null) return { foodId: it.foodId, grams: it.grams, cluster: it.cluster };
+            return { ...it, grams: Math.max(0, grams), locked: it.cluster !== 'veg' };
+          }),
+        },
+  );
+  return dropEmpty(optimizeDay({ meals }, target));
+}
+
+/** Piano salvato con le vecchie unità: stessi alimenti, grammature riadattate a pezzi/bicchieri. */
+export function migratePlan(plan: WeekPlan, p: Profile): WeekPlan {
+  const t = calcTargets(p);
+  return { ...plan, version: PLAN_VERSION, days: plan.days.map((d, i) => dropEmpty(optimizeDay(d, t.perDay[i]))) };
 }

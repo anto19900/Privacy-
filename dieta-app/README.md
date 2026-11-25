@@ -24,6 +24,9 @@ App Android (React + TypeScript + Tailwind CSS + Capacitor) per:
   di peso × 7.700) con proposta di correzione delle calorie applicabile con un tocco (`src/lib/adaptive.ts`).
 - **Promemoria** (notifiche locali): pesata, menù a Mamma (apre già il messaggio del giorno dopo), spesa.
 
+- **Misure casalinghe**: bicchieri (200 ml), frutti (200 g), vasetti, fette, scatolette… il piano usa pezzi interi
+  o mezzi; per olio, frutta secca ecc. grammi con indicazione (≈ 2 cucchiai).
+- **Quantità modificabili**: tocca la quantità per cambiarla; resta fissata e il resto del giorno si ribilancia.
 - **Preferiti e "mai più"** dal tasto Cambia; **varietà** alta/media/bassa; **pasti ripetibili**
   ("uguale a ieri", "ripeti questo pasto tutta la settimana").
 - **Giorni di allenamento**: +20% carboidrati, presi dai giorni di riposo (media settimanale e proteine invariate).

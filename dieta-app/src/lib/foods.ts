@@ -119,6 +119,77 @@ export const FOODS: Food[] = [
   F('ananas', 'Ananas', '🍍', ['fruit'], 'ortofrutta', [50, 0.5, 13, 0.1], [], [10, 50, 350]),
 ];
 
+/**
+ * Misure casalinghe.
+ *  - half / whole: il piano usa pezzi interi (o mezzi) → "1 e ½ bicchieri (300 ml)"
+ *  - hint: il piano resta in grammi, con un'indicazione → "20 g (≈ ½ manciata)"
+ */
+type Unit = { g: number; s: string; p: string; mode: 'half' | 'whole' | 'hint' };
+const UNITS: Record<string, Unit> = {
+  'latte-ps': { g: 200, s: 'bicchiere', p: 'bicchieri', mode: 'half' },
+  'latte-zl': { g: 200, s: 'bicchiere', p: 'bicchieri', mode: 'half' },
+  'bevanda-soia': { g: 200, s: 'bicchiere', p: 'bicchieri', mode: 'half' },
+  frutta: { g: 200, s: 'frutto', p: 'frutti', mode: 'half' },
+  mela: { g: 200, s: 'mela', p: 'mele', mode: 'half' },
+  pera: { g: 180, s: 'pera', p: 'pere', mode: 'half' },
+  arancia: { g: 200, s: 'arancia', p: 'arance', mode: 'half' },
+  banana: { g: 120, s: 'banana', p: 'banane', mode: 'half' },
+  kiwi: { g: 80, s: 'kiwi', p: 'kiwi', mode: 'whole' },
+  ananas: { g: 100, s: 'fetta', p: 'fette', mode: 'whole' },
+  'frutti-bosco': { g: 125, s: 'vaschetta', p: 'vaschette', mode: 'half' },
+  fragole: { g: 150, s: 'tazza', p: 'tazze', mode: 'hint' },
+  'yogurt-greco': { g: 170, s: 'vasetto', p: 'vasetti', mode: 'half' },
+  skyr: { g: 150, s: 'vasetto', p: 'vasetti', mode: 'half' },
+  'yogurt-proteico': { g: 150, s: 'vasetto', p: 'vasetti', mode: 'half' },
+  'yogurt-greco-zl': { g: 150, s: 'vasetto', p: 'vasetti', mode: 'half' },
+  'yogurt-soia': { g: 125, s: 'vasetto', p: 'vasetti', mode: 'whole' },
+  'fiocchi-latte': { g: 150, s: 'vasetto', p: 'vasetti', mode: 'hint' },
+  'mozzarella-light': { g: 125, s: 'mozzarella', p: 'mozzarelle', mode: 'half' },
+  tonno: { g: 80, s: 'scatoletta', p: 'scatolette', mode: 'whole' },
+  legumi: { g: 240, s: 'barattolo', p: 'barattoli', mode: 'hint' },
+  'pane-integrale': { g: 30, s: 'fetta', p: 'fette', mode: 'whole' },
+  'pane-segale': { g: 30, s: 'fetta', p: 'fette', mode: 'whole' },
+  crackers: { g: 25, s: 'pacchetto', p: 'pacchetti', mode: 'half' },
+  'proteine-polvere': { g: 30, s: 'misurino', p: 'misurini', mode: 'half' },
+  'proteine-vegetali': { g: 30, s: 'misurino', p: 'misurini', mode: 'half' },
+  cioccolato: { g: 5, s: 'quadretto', p: 'quadretti', mode: 'whole' },
+  patate: { g: 150, s: 'patata media', p: 'patate medie', mode: 'hint' },
+  'patate-dolci': { g: 200, s: 'patata dolce', p: 'patate dolci', mode: 'hint' },
+  'frutta-secca': { g: 30, s: 'manciata', p: 'manciate', mode: 'hint' },
+  'burro-arachidi': { g: 15, s: 'cucchiaio', p: 'cucchiai', mode: 'hint' },
+  semi: { g: 10, s: 'cucchiaio', p: 'cucchiai', mode: 'hint' },
+  parmigiano: { g: 5, s: 'cucchiaio grattugiato', p: 'cucchiai grattugiati', mode: 'hint' },
+  olio: { g: 10, s: 'cucchiaio', p: 'cucchiai', mode: 'hint' },
+  avena: { g: 10, s: 'cucchiaio', p: 'cucchiai', mode: 'hint' },
+  'corn-flakes': { g: 30, s: 'tazza', p: 'tazze', mode: 'hint' },
+  muesli: { g: 30, s: 'tazza', p: 'tazze', mode: 'hint' },
+  albumi: { g: 33, s: 'albume', p: 'albumi', mode: 'hint' },
+  bresaola: { g: 10, s: 'fetta', p: 'fette', mode: 'hint' },
+  'fesa-affettato': { g: 15, s: 'fetta', p: 'fette', mode: 'hint' },
+  'crudo-sgrassato': { g: 15, s: 'fetta', p: 'fette', mode: 'hint' },
+};
+
+/** massimo per pasto in pezzi (es. non più di 2 vasetti di yogurt) */
+const MAX_PIECES: Record<string, number> = {
+  'yogurt-greco': 2, skyr: 2, 'yogurt-proteico': 2, 'yogurt-greco-zl': 2, 'yogurt-soia': 2,
+  'latte-ps': 2, 'latte-zl': 2, 'bevanda-soia': 2, 'mozzarella-light': 1.5, 'proteine-polvere': 1, 'proteine-vegetali': 1,
+};
+
+for (const f of FOODS) {
+  const u = UNITS[f.id];
+  if (!u) continue;
+  if (u.mode === 'hint') {
+    f.household = { grams: u.g, singular: u.s, plural: u.p };
+    continue;
+  }
+  const half = u.mode === 'half';
+  f.piece = { grams: u.g, singular: u.s, plural: u.p, half };
+  f.step = half ? u.g / 2 : u.g;
+  f.min = Math.max(f.step, Math.floor(f.min / f.step) * f.step);
+  f.max = Math.max(f.min + f.step, Math.ceil(f.max / f.step) * f.step);
+  if (MAX_PIECES[f.id]) f.max = Math.max(f.min, MAX_PIECES[f.id] * u.g);
+}
+
 const BY_ID = new Map(FOODS.map((f) => [f.id, f]));
 
 /** Per piani salvati con alimenti rimossi o rinominati. */

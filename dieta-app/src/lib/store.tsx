@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { calcTargets } from './nutrition';
-import { copyDay, generateWeek, PLAN_VERSION, repeatMeal, replaceFoodEverywhere, swapInDay } from './plan';
+import { copyDay, generateWeek, migratePlan, PLAN_VERSION, repeatMeal, replaceFoodEverywhere, setQuantity as setQty, swapInDay } from './plan';
 import { clearAll, importBackup, load, save } from './storage';
 import { restorePhotos } from './backup';
 import { clearPhotos, deletePhoto } from './photos';
@@ -32,6 +32,7 @@ interface Store {
   setReminders: (r: Reminders) => Promise<ApplyResult>;
   applyKcalAdjust: (delta: number) => void;
   toggleFavorite: (foodId: string) => void;
+  setQuantity: (day: number, meal: MealKey, itemIndex: number, grams: number | null) => void;
   banFood: (foodId: string) => void;
   copyFromPreviousDay: (day: number) => void;
   repeatMealAllWeek: (day: number, meal: MealKey) => void;
@@ -57,6 +58,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const saved = load<WeekPlan | null>('plan', null);
     const prof = load<Profile | null>('profile', null);
     // piano creato con una versione precedente dell'algoritmo: lo rigenera rispettando i macro
+    if (prof && saved && saved.version === 2) return migratePlan(saved, prof); // mantiene alimenti e cambi
     if (prof && (!saved || saved.version !== PLAN_VERSION)) return generateWeek(prof);
     return saved;
   });
@@ -200,7 +202,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     window.location.reload();
   }, []);
 
+  const setQuantity = useCallback(
+    (day: number, mealKey: MealKey, itemIndex: number, grams: number | null) => {
+      if (!targets) return;
+      setPlan((pl) => (pl ? { ...pl, days: pl.days.map((d, i) => (i === day ? setQty(d, mealKey, itemIndex, grams, targets.perDay[i]) : d)) } : pl));
+    },
+    [targets],
+  );
+
   const value: Store = {
+    setQuantity,
     therapy,
     therapyLog,
     saveTherapy: async (t) => {

@@ -95,7 +95,10 @@ export interface Food {
   step: number; // arrotondamento
   min: number;
   max: number;
-  piece?: { grams: number; singular: string; plural: string };
+  /** unità "a pezzi": il piano usa multipli interi (o mezzi, se half) */
+  piece?: { grams: number; singular: string; plural: string; half?: boolean };
+  /** misura casalinga solo indicativa (es. ≈ 2 cucchiai), il piano resta in grammi */
+  household?: { grams: number; singular: string; plural: string };
   /** Usato dal generatore solo se non ci sono alternative "principali" (resta sempre selezionabile con Cambia). */
   fallback?: boolean;
   emoji: string;
@@ -107,6 +110,8 @@ export interface MealItem {
   foodId: string;
   grams: number;
   cluster: Cluster;
+  /** quantità scelta a mano: l'ottimizzatore non la cambia */
+  locked?: boolean;
 }
 
 export interface Meal {

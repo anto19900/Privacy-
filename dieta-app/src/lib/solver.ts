@@ -49,7 +49,7 @@ export function optimizeDay(day: DayPlan, target: MacroTarget, locked: ReadonlyS
     meal.items.forEach((it, ii) => {
       const food = getFood(it.foodId);
       const coef = { kcal: food.kcal / 100, p: food.p / 100, c: food.c / 100, f: food.f / 100 };
-      if (it.cluster === 'veg') {
+      if (it.cluster === 'veg' || it.locked) {
         fixed.kcal += coef.kcal * it.grams;
         fixed.p += coef.p * it.grams;
         fixed.c += coef.c * it.grams;
@@ -58,7 +58,7 @@ export function optimizeDay(day: DayPlan, target: MacroTarget, locked: ReadonlyS
         return;
       }
       // voci facoltative: l'ottimizzatore può azzerarle (e vengono tolte) se servono a restare nei macro
-      const optional = it.cluster === 'topping' || (meal.key === 'colazione' && it.cluster === 'fruit');
+      const optional = it.cluster === 'topping' || it.cluster === 'snackCarb' || (meal.key === 'colazione' && it.cluster === 'fruit');
       vars.push({ meal: mi, item: ii, coef, min: optional ? 0 : food.min, max: food.max, step: food.step });
       g0.push(Math.min(food.max, Math.max(food.min, it.grams || food.min)));
     });
@@ -122,25 +122,47 @@ export function optimizeDay(day: DayPlan, target: MacroTarget, locked: ReadonlyS
       return s + row.w * (nr * nr - r[k] * r[k]);
     }, 0);
 
-  for (let pass = 0; pass < 80; pass++) {
-    let best = { i: -1, ng: 0, gain: -1e-9 };
+  const fits = (i: number, ng: number) => ng >= vars[i].min - 1e-9 && ng <= vars[i].max + 1e-9;
+  const delta2 = (i: number, di: number, j: number, dj: number) =>
+    rows.reduce((s, row, k) => {
+      const nr = r[k] + row.a[i] * di + row.a[j] * dj;
+      return s + row.w * (nr * nr - r[k] * r[k]);
+    }, 0);
+
+  for (let pass = 0; pass < 120; pass++) {
+    let best = { i: -1, di: 0, j: -1, dj: 0, gain: -1e-9 };
+    // mosse singole: ±1 o ±2 unità
     for (let i = 0; i < n; i++) {
       const v = vars[i];
       for (const d of [v.step, -v.step, 2 * v.step, -2 * v.step]) {
-        const ng = g[i] + d;
-        if (ng < v.min - 1e-9 || ng > v.max + 1e-9) continue;
+        if (!fits(i, g[i] + d)) continue;
         const dl = delta(i, d);
-        if (dl < best.gain) best = { i, ng, gain: dl };
+        if (dl < best.gain) best = { i, di: d, j: -1, dj: 0, gain: dl };
       }
     }
+    // mosse a coppie (+1 unità a uno, −1 a un altro): utili con unità grossolane (fette, frutti, vasetti)
+    if (best.i < 0) {
+      for (let i = 0; i < n; i++)
+        for (let j = 0; j < n; j++) {
+          if (i === j) continue;
+          for (const si of [1, -1]) {
+            const di = si * vars[i].step;
+            const dj = -si * vars[j].step;
+            if (!fits(i, g[i] + di) || !fits(j, g[j] + dj)) continue;
+            const dl = delta2(i, di, j, dj);
+            if (dl < best.gain) best = { i, di, j, dj, gain: dl };
+          }
+        }
+    }
     if (best.i < 0) break;
-    move(best.i, best.ng);
+    move(best.i, g[best.i] + best.di);
+    if (best.j >= 0) move(best.j, g[best.j] + best.dj);
   }
 
   vars.forEach((v, i) => {
     const food = getFood(meals[v.meal].items[v.item].foodId);
     // sotto il minimo "sensato" una voce facoltativa viene tolta
-    meals[v.meal].items[v.item].grams = g[i] < food.min ? 0 : Math.round(g[i]);
+    meals[v.meal].items[v.item].grams = g[i] < food.min ? 0 : Math.round(g[i] * 10) / 10;
   });
   return { meals };
 }
