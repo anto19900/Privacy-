@@ -1,11 +1,11 @@
-import { ArrowLeftRight, Ban, Check, CircleSlash, Lock, Minus, PencilLine, Plus, Repeat, Star, Undo2 } from 'lucide-react';
+import { ArrowLeftRight, Ban, Check, CircleSlash, Lock, Minus, PencilLine, Plus, Repeat, Search, Star, Trash2, Undo2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { logDone, logOther, logSkipped, mealMacros } from '../lib/diary';
 import { getFood } from '../lib/foods';
 import { fmtQty } from '../lib/format';
-import { alternativesFor, CLUSTER_LABEL, dayItems, MEALS, setQuantity as previewQuantity, sumMacros } from '../lib/plan';
+import { ADDABLE, allowedInCluster, alternativesDetailed, macroWarnings, CLUSTER_LABEL, dayItems, MEALS, setQuantity as previewQuantity, sumMacros } from '../lib/plan';
 import { useStore } from '../lib/store';
-import type { DayPlan, MacroTarget, Meal, MealItem, MealKey, MealLog } from '../lib/types';
+import type { Cluster, DayPlan, MacroTarget, Meal, MealItem, MealKey, MealLog, Profile } from '../lib/types';
 import { Sheet } from './Sheet';
 
 interface Props {
@@ -28,7 +28,9 @@ const STATUS = {
 } as const;
 
 export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced, onRepeat }: Props) {
-  const { profile, plan, targets, swap, toggleFavorite, banFood, setQuantity } = useStore();
+  const { profile, plan, targets, swap, toggleFavorite, banFood, setQuantity, addFood, removeFood } = useStore();
+  const [addOpen, setAddOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const [qtyEdit, setQtyEdit] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [otherOpen, setOtherOpen] = useState(false);
@@ -41,7 +43,7 @@ export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced, onRe
   const planIndex = current && day ? day.meals.find((m) => m.key === meal.key)?.items.findIndex((x) => x.foodId === current.foodId) ?? -1 : -1;
   const alts = useMemo(
     () =>
-      planIndex >= 0 && day && profile && targets ? alternativesFor(day, meal.key, planIndex, profile, targets.perDay[dayIndex]) : [],
+      planIndex >= 0 && day && profile && targets ? alternativesDetailed(day, meal.key, planIndex, profile, targets.perDay[dayIndex]) : [],
     [planIndex, day, profile, targets, meal.key, dayIndex],
   );
   const locked = !!log;
@@ -166,6 +168,22 @@ export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced, onRe
           );
         })}
       </ul>
+      {!locked && (
+        <button className="mt-1 flex items-center gap-1.5 rounded-lg px-1 py-2 text-sm font-semibold text-emerald-700 active:bg-emerald-50" onClick={() => setAddOpen(true)}>
+          <Plus size={16} /> Aggiungi alimento
+        </button>
+      )}
+      {addOpen && profile && (
+        <AddSheet
+          meal={meal}
+          profile={profile}
+          onClose={() => setAddOpen(false)}
+          onAdd={(foodId, cluster) => {
+            addFood(dayIndex, meal.key, foodId, cluster);
+            setAddOpen(false);
+          }}
+        />
+      )}
       {!compact && (
         <p className="mt-2 text-xs text-slate-500">
           P {Math.round(tot.p)}g · C {Math.round(tot.c)}g · G {Math.round(tot.f)}g
@@ -176,7 +194,10 @@ export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced, onRe
 
       <Sheet
         open={current !== null}
-        onClose={() => setEditing(null)}
+        onClose={() => {
+          setEditing(null);
+          setQuery('');
+        }}
         title="Alternative equivalenti"
         subtitle={current ? `${CLUSTER_LABEL[current.cluster]} · grammature ricalcolate per restare nei tuoi macro` : ''}
       >
@@ -211,15 +232,31 @@ export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced, onRe
                 <Ban size={18} /> Mai più
               </button>
             </div>
+            <button
+              className="btn w-full border border-slate-200 bg-white text-sm text-slate-600"
+              onClick={() => {
+                if (planIndex >= 0) removeFood(dayIndex, meal.key, planIndex);
+                setEditing(null);
+              }}
+            >
+              <Trash2 size={18} /> Togli dal pasto
+            </button>
             <p className="pt-1 text-center text-sm font-semibold uppercase tracking-wide text-slate-400">oppure</p>
+            {alts.length > 6 && (
+              <label className="relative block">
+                <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input className="input pl-10" placeholder={`Cerca tra ${alts.length} alternative…`} value={query} onChange={(e) => setQuery(e.target.value)} />
+              </label>
+            )}
             {alts.length === 0 && <p className="text-center text-slate-500">Nessuna alternativa compatibile con le tue preferenze.</p>}
             {alts.length > 0 && (
               <p className="text-center text-xs text-slate-400">
                 Scegliendo un'alternativa, le altre grammature del giorno si adattano leggermente per mantenere proteine, carboidrati e grassi.
               </p>
             )}
-            {alts.map((a) => {
+            {alts.filter((x) => !query || getFood(x.item.foodId).name.toLowerCase().includes(query.toLowerCase())).map(({ item: a, day: dm }) => {
               const f = getFood(a.foodId);
+              const warn = targets ? macroWarnings(dm, targets.perDay[dayIndex]) : [];
               return (
                 <button
                   key={a.foodId}
@@ -236,8 +273,15 @@ export function MealCard({ meal, dayIndex, compact, log, onLog, rebalanced, onRe
                       {Math.round((f.kcal * a.grams) / 100)} kcal · P {Math.round((f.p * a.grams) / 100)} · C {Math.round((f.c * a.grams) / 100)} · G{' '}
                       {Math.round((f.f * a.grams) / 100)}
                     </p>
+                    {warn.length > 0 ? (
+                      <p className="mt-0.5 text-xs font-semibold text-amber-700">⚠ Il giorno esce dai macro: {warn.join(', ')}</p>
+                    ) : (
+                      <p className="mt-0.5 text-xs font-medium text-emerald-700">✓ il giorno resta nei macro</p>
+                    )}
                   </div>
-                  <span className="rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-bold text-white">{fmtQty(a.foodId, a.grams)}</span>
+                  <span className={`shrink-0 rounded-xl px-3 py-1.5 text-sm font-bold text-white ${warn.length ? 'bg-amber-500' : 'bg-emerald-600'}`}>
+                    {fmtQty(a.foodId, a.grams)}
+                  </span>
                 </button>
               );
             })}
@@ -373,6 +417,46 @@ function OtherSheet({ open, plannedKcal, title, onClose, onSave }: {
         <button className="btn-primary px-5" disabled={!(n > 0)} onClick={() => n > 0 && onSave(n)}>
           Salva
         </button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** Aggiunge un alimento al pasto, scegliendo per categoria. */
+function AddSheet({ meal, profile, onClose, onAdd }: { meal: Meal; profile: Profile; onClose: () => void; onAdd: (foodId: string, cluster: Cluster) => void }) {
+  const cats = ADDABLE[meal.key];
+  const [cat, setCat] = useState<Cluster>(cats[0]);
+  const [q, setQ] = useState('');
+  const inMeal = new Set(meal.items.map((i) => i.foodId));
+  const foods = allowedInCluster(cat, profile).filter((f) => !inMeal.has(f.id) && (!q || f.name.toLowerCase().includes(q.toLowerCase())));
+
+  return (
+    <Sheet open onClose={onClose} title={`Aggiungi a ${MEALS[meal.key].label.toLowerCase()}`} subtitle="Le altre quantità del giorno si adattano per restare nei macro.">
+      <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+        {cats.map((c) => (
+          <button key={c} className={`shrink-0 ${cat === c ? 'chip-on' : 'chip-off'}`} onClick={() => setCat(c)}>
+            {CLUSTER_LABEL[c]}
+          </button>
+        ))}
+      </div>
+      <label className="relative mb-3 block">
+        <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input className="input pl-10" placeholder="Cerca…" value={q} onChange={(e) => setQ(e.target.value)} />
+      </label>
+      <div className="space-y-2">
+        {foods.length === 0 && <p className="text-center text-slate-500">Nessun alimento disponibile in questa categoria.</p>}
+        {foods.map((f) => (
+          <button key={f.id} onClick={() => onAdd(f.id, cat)} className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left active:bg-emerald-50">
+            <span className="text-2xl">{f.emoji}</span>
+            <div className="flex-1">
+              <p className="font-semibold text-slate-800">{f.name}</p>
+              <p className="text-xs text-slate-500">
+                per 100 {f.unit}: {f.kcal} kcal · P {f.p} · C {f.c} · G {f.f}
+              </p>
+            </div>
+            <Plus className="text-emerald-600" />
+          </button>
+        ))}
       </div>
     </Sheet>
   );

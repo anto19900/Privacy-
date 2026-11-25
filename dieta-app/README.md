@@ -26,6 +26,9 @@ App Android (React + TypeScript + Tailwind CSS + Capacitor) per:
 
 - **Misure casalinghe**: bicchieri (200 ml), frutti (200 g), vasetti, fette, scatolette… il piano usa pezzi interi
   o mezzi; per olio, frutta secca ecc. grammi con indicazione (≈ 2 cucchiai).
+- **Più scelte**: ~120 alimenti (formaggi freschi e salato a colazione, marmellata/miele, frutta secca e barrette a merenda,
+  piadina, wrap, pesto, hummus, frutta e verdura di stagione). Ogni alternativa indica se il giorno resta nei macro;
+  si possono **aggiungere** o **togliere** alimenti da un pasto.
 - **Quantità modificabili**: tocca la quantità per cambiarla; resta fissata e il resto del giorno si ribilancia.
 - **Preferiti e "mai più"** dal tasto Cambia; **varietà** alta/media/bassa; **pasti ripetibili**
   ("uguale a ieri", "ripeti questo pasto tutta la settimana").

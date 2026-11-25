@@ -1,13 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { calcTargets } from './nutrition';
-import { copyDay, generateWeek, migratePlan, PLAN_VERSION, repeatMeal, replaceFoodEverywhere, setQuantity as setQty, swapInDay } from './plan';
+import { addItem, copyDay, generateWeek, removeItem, migratePlan, PLAN_VERSION, repeatMeal, replaceFoodEverywhere, setQuantity as setQty, swapInDay } from './plan';
 import { clearAll, importBackup, load, save } from './storage';
 import { restorePhotos } from './backup';
 import { clearPhotos, deletePhoto } from './photos';
 import { isoDate } from './format';
 import { applyReminders, applyTherapy, DEFAULT_REMINDERS, type ApplyResult } from './notifications';
 import { EMPTY_THERAPY } from './therapy';
-import type { ExtraItem, FoodLog, Measurement, Pantry, Therapy, TherapyLog, MealKey, MealLog, Profile, Reminders, ShoppingState, Targets, WeekPlan, WeightEntry } from './types';
+import type { Cluster, ExtraItem, FoodLog, Measurement, Pantry, Therapy, TherapyLog, MealKey, MealLog, Profile, Reminders, ShoppingState, Targets, WeekPlan, WeightEntry } from './types';
 
 interface Store {
   profile: Profile | null;
@@ -33,6 +33,8 @@ interface Store {
   applyKcalAdjust: (delta: number) => void;
   toggleFavorite: (foodId: string) => void;
   setQuantity: (day: number, meal: MealKey, itemIndex: number, grams: number | null) => void;
+  addFood: (day: number, meal: MealKey, foodId: string, cluster: Cluster) => void;
+  removeFood: (day: number, meal: MealKey, itemIndex: number) => void;
   banFood: (foodId: string) => void;
   copyFromPreviousDay: (day: number) => void;
   repeatMealAllWeek: (day: number, meal: MealKey) => void;
@@ -210,7 +212,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [targets],
   );
 
+  const editDay = useCallback(
+    (day: number, fn: (d: WeekPlan['days'][number], t: Targets['perDay'][number]) => WeekPlan['days'][number]) => {
+      if (!targets) return;
+      setPlan((pl) => (pl ? { ...pl, days: pl.days.map((d, i) => (i === day ? fn(d, targets.perDay[i]) : d)) } : pl));
+    },
+    [targets],
+  );
+
   const value: Store = {
+    addFood: (day, meal, foodId, cluster) => editDay(day, (d, t) => addItem(d, meal, foodId, cluster, t)),
+    removeFood: (day, meal, idx) => editDay(day, (d, t) => removeItem(d, meal, idx, t)),
     setQuantity,
     therapy,
     therapyLog,

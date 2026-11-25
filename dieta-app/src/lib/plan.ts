@@ -225,8 +225,14 @@ function swapRaw(day: DayPlan, mealKey: MealKey, itemIndex: number, foodId: stri
   return optimizeDay({ meals }, target);
 }
 
-/** Alternative dello stesso cluster, con le grammature che avrebbero dopo il ribilanciamento. */
-export function alternativesFor(day: DayPlan, mealKey: MealKey, itemIndex: number, p: Profile, target: MacroTarget): MealItem[] {
+export interface Alternative {
+  item: MealItem;
+  /** macro del giorno dopo la sostituzione */
+  day: MacroTarget;
+}
+
+/** Alternative dello stesso cluster, con grammature e macro del giorno dopo il ribilanciamento. */
+export function alternativesDetailed(day: DayPlan, mealKey: MealKey, itemIndex: number, p: Profile, target: MacroTarget): Alternative[] {
   const meal = day.meals.find((m) => m.key === mealKey);
   const item = meal?.items[itemIndex];
   if (!item) return [];
@@ -234,9 +240,27 @@ export function alternativesFor(day: DayPlan, mealKey: MealKey, itemIndex: numbe
     .filter((f) => f.id !== item.foodId)
     .map((f) => {
       const nd = swapRaw(day, mealKey, itemIndex, f.id, target);
-      return nd.meals.find((m) => m.key === mealKey)!.items[itemIndex];
+      const m = sumMacros(dayItems(nd));
+      return { item: nd.meals.find((x) => x.key === mealKey)!.items[itemIndex], day: { kcal: m.kcal, p: m.p, c: m.c, f: m.f } };
     })
-    .filter((it) => it.grams > 0);
+    .filter((a) => a.item.grams > 0);
+}
+
+export function alternativesFor(day: DayPlan, mealKey: MealKey, itemIndex: number, p: Profile, target: MacroTarget): MealItem[] {
+  return alternativesDetailed(day, mealKey, itemIndex, p, target).map((a) => a.item);
+}
+
+/** Scostamenti significativi dal target (oltre 8% o 5 g). */
+export function macroWarnings(got: MacroTarget, t: MacroTarget): string[] {
+  const out: string[] = [];
+  const chk = (label: string, v: number, tv: number) => {
+    const d = v - tv;
+    if (Math.abs(d) > Math.max(5, tv * 0.08)) out.push(`${label} ${d > 0 ? '+' : '−'}${Math.round(Math.abs(d))} g`);
+  };
+  chk('proteine', got.p, t.p);
+  chk('carboidrati', got.c, t.c);
+  chk('grassi', got.f, t.f);
+  return out;
 }
 
 /** Indice del giorno corrente con Lunedì = 0. */
@@ -309,4 +333,33 @@ export function setQuantity(day: DayPlan, mealKey: MealKey, itemIndex: number, g
 export function migratePlan(plan: WeekPlan, p: Profile): WeekPlan {
   const t = calcTargets(p);
   return { ...plan, version: PLAN_VERSION, days: plan.days.map((d, i) => dropEmpty(optimizeDay(d, t.perDay[i]))) };
+}
+
+/** Categorie che si possono aggiungere a ciascun pasto. */
+export const ADDABLE: Record<MealKey, Cluster[]> = {
+  colazione: ['colazioneProt', 'colazioneCarb', 'fruit', 'topping'],
+  spuntino: ['snack', 'fruit', 'snackCarb', 'topping'],
+  pranzo: ['protein', 'carb', 'veg', 'fat'],
+  merenda: ['snack', 'snackCarb', 'fruit', 'topping'],
+  cena: ['protein', 'carb', 'veg', 'fat'],
+};
+
+/**
+ * Aggiunge un alimento al pasto e ri-ottimizza il giorno.
+ * L'alimento aggiunto parte bloccato su una porzione sensata (l'utente lo ha scelto apposta),
+ * gli altri si adattano.
+ */
+export function addItem(day: DayPlan, mealKey: MealKey, foodId: string, cluster: Cluster, target: MacroTarget): DayPlan {
+  const f = getFood(foodId);
+  const portion = cluster === 'veg' ? VEG_GRAMS : f.piece ? f.piece.grams : f.household ? Math.max(f.min, roundGrams(f, f.household.grams)) : f.min;
+  const meals = day.meals.map((m) =>
+    m.key !== mealKey || m.free ? m : { ...m, items: [...m.items, { foodId, grams: Math.min(f.max, portion), cluster, locked: cluster !== 'veg' }] },
+  );
+  return dropEmpty(optimizeDay({ meals }, target));
+}
+
+/** Toglie un alimento dal pasto e ri-ottimizza il giorno. */
+export function removeItem(day: DayPlan, mealKey: MealKey, itemIndex: number, target: MacroTarget): DayPlan {
+  const meals = day.meals.map((m) => (m.key !== mealKey ? m : { ...m, items: m.items.filter((_, i) => i !== itemIndex) }));
+  return dropEmpty(optimizeDay({ meals }, target));
 }

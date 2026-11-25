@@ -62,6 +62,23 @@ export const PACKS: Record<string, { size: number; name: string }> = {
   'burro-arachidi': { size: 350, name: 'vasetto da 350 g' },
   semi: { size: 250, name: 'busta da 250 g' },
   cioccolato: { size: 100, name: 'tavoletta da 100 g' },
+  'formaggio-spalmabile': { size: 150, name: 'vaschetta da 150 g' },
+  'spalmabile-vegetale': { size: 150, name: 'vaschetta da 150 g' },
+  quark: { size: 250, name: 'vasetto da 250 g' },
+  'stracchino-light': { size: 100, name: 'confezione da 100 g' },
+  marmellata: { size: 340, name: 'vasetto da 340 g' },
+  'marmellata-light': { size: 250, name: 'vasetto da 250 g' },
+  miele: { size: 500, name: 'barattolo da 500 g' },
+  'crema-nocciole': { size: 400, name: 'barattolo da 400 g' },
+  biscotti: { size: 350, name: 'pacco da 350 g' },
+  cornetto: { size: 300, name: 'confezione da 6' },
+  'gallette-mais': { size: 120, name: 'pacco da 120 g' },
+  grissini: { size: 250, name: 'pacco da 250 g' },
+  'barretta-proteica': { size: 50, name: 'barretta' },
+  hummus: { size: 200, name: 'vaschetta da 200 g' },
+  piadina: { size: 300, name: 'confezione da 3' },
+  wrap: { size: 360, name: 'confezione da 6' },
+  pesto: { size: 190, name: 'vasetto da 190 g' },
 };
 
 /** Arrotondamento per gli alimenti sfusi (banco, ortofrutta). */
